@@ -10,3 +10,9 @@ yarn-error.log*
 
 .vscode/*
 .idea
+
+# Secrets
+.env
+
+# LocalStack
+localstack_data/

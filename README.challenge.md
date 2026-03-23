@@ -1,4 +1,4 @@
-The Candidate ChallengeInclu
+The Candidate Challenge (README.md)
 
 # Full Stack Challenge: Medical Provider Verifier
 

@@ -7,12 +7,14 @@ yarn-debug.log*
 yarn-error.log*
 /.pnp
 .pnp.js
+services/worker/smoke-test.ts
 
 .vscode/*
 .idea
 
 # Secrets
 .env
+.oc-cookies.json
 
 # Council logs
 .claude/councils/

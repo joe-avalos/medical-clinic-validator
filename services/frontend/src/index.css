@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+@theme {
+  --color-slate-950: #0a0e1a;
+  --color-slate-900: #111827;
+  --color-slate-850: #151c2e;
+  --color-slate-800: #1e2640;
+  --color-slate-700: #2a3352;
+  --color-slate-600: #3d4a6b;
+  --color-slate-500: #5a6a8a;
+  --color-slate-400: #8492b1;
+  --color-slate-300: #a8b5cc;
+  --color-slate-200: #cdd5e5;
+  --color-slate-100: #e8ecf4;
+  --color-slate-50: #f4f6fb;
+
+  --color-risk-low: #22c55e;
+  --color-risk-low-bg: #052e16;
+  --color-risk-medium: #f59e0b;
+  --color-risk-medium-bg: #451a03;
+  --color-risk-high: #ef4444;
+  --color-risk-high-bg: #450a0a;
+  --color-risk-unknown: #6b7280;
+  --color-risk-unknown-bg: #1f2937;
+
+  --color-accent: #6366f1;
+  --color-accent-hover: #818cf8;
+  --color-accent-muted: #312e81;
+
+  --font-sans: "DM Sans", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-serif: "Instrument Serif", Georgia, serif;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-slate-700) transparent;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-slate-950);
+  color: var(--color-slate-200);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: white;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+  50% { box-shadow: 0 0 20px 4px rgba(99, 102, 241, 0.15); }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.4s ease-out both;
+}
+
+.animate-slide-in {
+  animation: slide-in-right 0.3s ease-out both;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.stagger-1 { animation-delay: 50ms; }
+.stagger-2 { animation-delay: 100ms; }
+.stagger-3 { animation-delay: 150ms; }
+.stagger-4 { animation-delay: 200ms; }
+.stagger-5 { animation-delay: 250ms; }

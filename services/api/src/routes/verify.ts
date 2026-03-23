@@ -2,9 +2,9 @@ import { Router, type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { VerifyRequestSchema } from '@medical-validator/shared';
 import type { JwtClaims } from '@medical-validator/shared';
-import { createJob } from '../clients/dynamodb.js';
+import { createJob, getJobStatus, getVerificationResults } from '../clients/dynamodb.js';
 import { sendToVerificationQueue } from '../clients/sqs.js';
-import { getJobStatus, getVerificationResults } from '../clients/dynamodb.js';
+import { getCachedJobId } from '../clients/redis.js';
 
 export const verifyRouter = Router();
 
@@ -52,6 +52,24 @@ verifyRouter.post('/', async (req: Request, res: Response) => {
   const normalizedName = normalizeName(companyName);
 
   try {
+    // Check Redis cache — return existing jobId immediately if available
+    try {
+      const cached = await getCachedJobId(normalizedName);
+      if (cached) {
+        console.log(`[API] Cache hit for "${normalizedName}" → job ${cached.jobId}`);
+        res.status(200).json({
+          jobId: cached.jobId,
+          status: 'completed',
+          pollUrl: `/verify/${cached.jobId}/status`,
+          cached: true,
+          cachedAt: cached.createdAt,
+        });
+        return;
+      }
+    } catch (err) {
+      console.warn('[API] Redis cache check failed, proceeding:', (err as Error).message);
+    }
+
     await createJob({
       jobId,
       companyName,

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "dev:local": "dotenv -e ../../.env -- tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "test": "vitest run",
@@ -24,6 +25,7 @@
     "zod": "^3.23.0"
   },
   "devDependencies": {
+    "dotenv-cli": "^11.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.9.0",
     "vitest": "^4.1.0"

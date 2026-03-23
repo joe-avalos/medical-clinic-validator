@@ -11,7 +11,7 @@ function getClient(): Redis {
       maxRetriesPerRequest: 1,
       lazyConnect: true,
     });
-    redis.on('error', (err) => {
+    redis.on('error', (err: Error) => {
       console.warn('[redis] Connection error:', err.message);
     });
   }

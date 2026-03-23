@@ -12,7 +12,8 @@ config({ path: resolve(ROOT, '.env') });
 
 const COOKIES_PATH = resolve(
   ROOT,
-  process.env.OC_COOKIES_PATH || 'services/worker/.oc-cookies.json',
+  'services/worker',
+  process.env.OC_COOKIES_PATH || '.oc-cookies.json',
 );
 const OC_BASE = process.env.OC_BASE_URL || 'https://opencorporates.com';
 

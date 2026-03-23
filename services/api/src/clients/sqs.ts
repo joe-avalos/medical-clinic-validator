@@ -7,8 +7,8 @@ const sqs = new SQSClient({
 });
 
 const VERIFICATION_QUEUE_URL =
-  process.env.VERIFICATION_QUEUE_URL ||
-  'http://localhost:4566/000000000000/verification-queue.fifo';
+  process.env.SQS_VERIFICATION_QUEUE_URL ||
+  'http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/verification-queue.fifo';
 
 export async function sendToVerificationQueue(
   message: VerificationJobMessage,

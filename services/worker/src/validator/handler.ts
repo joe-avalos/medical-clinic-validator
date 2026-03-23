@@ -3,7 +3,7 @@ import type { ValidationResult, ValidationResultMessage } from '@medical-validat
 import { createAIProvider } from './ai-provider.js';
 import { sendMessage } from '../shared/sqs.js';
 
-const STORAGE_QUEUE_URL = process.env.STORAGE_QUEUE_URL || 'http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/storage-queue.fifo';
+const STORAGE_QUEUE_URL = process.env.SQS_STORAGE_QUEUE_URL || 'http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/storage-queue.fifo';
 
 const provider = createAIProvider();
 

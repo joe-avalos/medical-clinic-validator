@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { parseSearchResults } from '../clients/opencorporates-parser.js';
+import { parseSearchResults } from '../opencorporates-parser.js';
 
 const fixture = (name: string) =>
   readFileSync(join(__dirname, 'fixtures', name), 'utf-8');

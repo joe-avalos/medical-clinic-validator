@@ -1,9 +1,9 @@
 import { VerificationJobMessageSchema } from '@medical-validator/shared';
 import type { ScraperResultMessage } from '@medical-validator/shared';
-import { updateJobStatus } from '../clients/dynamodb.js';
-import { getCachedScraperResult, setCachedScraperResult } from '../clients/redis.js';
-import { scrapeOpenCorporates } from '../clients/opencorporates.js';
-import { sendMessage } from '../lib/sqs.js';
+import { updateJobStatus } from '../shared/dynamodb.js';
+import { getCachedScraperResult, setCachedScraperResult } from '../shared/redis.js';
+import { scrapeOpenCorporates } from './opencorporates.js';
+import { sendMessage } from '../shared/sqs.js';
 
 const VALIDATION_QUEUE_URL =
   process.env.SQS_VALIDATION_QUEUE_URL ||

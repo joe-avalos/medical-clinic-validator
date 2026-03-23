@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeCompanyName } from '../lib/normalize.js';
+import { normalizeCompanyName } from '../normalize.js';
 
 describe('normalizeCompanyName', () => {
   it('lowercases the name', () => {

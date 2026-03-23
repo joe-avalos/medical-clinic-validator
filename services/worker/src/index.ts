@@ -1,4 +1,4 @@
-import { pollQueue } from './lib/sqs.js';
+import { pollQueue } from './shared/sqs.js';
 
 const WORKER_TYPE = process.env.WORKER_TYPE;
 
@@ -25,21 +25,21 @@ async function main(): Promise<void> {
     case 'scraper': {
       const queueUrl = process.env.SQS_VERIFICATION_QUEUE_URL;
       if (!queueUrl) throw new Error('SQS_VERIFICATION_QUEUE_URL is required');
-      const { handleScraperMessage } = await import('./workers/scraper.js');
+      const { handleScraperMessage } = await import('./scraper/handler.js');
       await pollQueue(queueUrl, handleScraperMessage, ac.signal);
       break;
     }
     case 'ai-validator': {
       const queueUrl = process.env.SQS_VALIDATION_QUEUE_URL;
       if (!queueUrl) throw new Error('SQS_VALIDATION_QUEUE_URL is required');
-      const { handleValidatorMessage } = await import('./workers/validator.js');
+      const { handleValidatorMessage } = await import('./validator/handler.js');
       await pollQueue(queueUrl, handleValidatorMessage, ac.signal);
       break;
     }
     case 'storage': {
       const queueUrl = process.env.SQS_STORAGE_QUEUE_URL;
       if (!queueUrl) throw new Error('SQS_STORAGE_QUEUE_URL is required');
-      const { handleStorageMessage } = await import('./workers/storage.js');
+      const { handleStorageMessage } = await import('./storage/handler.js');
       await pollQueue(queueUrl, handleStorageMessage, ac.signal);
       break;
     }

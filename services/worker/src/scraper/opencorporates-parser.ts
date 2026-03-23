@@ -1,6 +1,6 @@
 import * as cheerio from 'cheerio';
 import type { RawCompanyRecord } from '@medical-validator/shared';
-import { parseOCDate } from '../lib/parse-date.js';
+import { parseOCDate } from './parse-date.js';
 
 const MAX_RESULTS = 5;
 const OC_BASE = 'https://opencorporates.com';

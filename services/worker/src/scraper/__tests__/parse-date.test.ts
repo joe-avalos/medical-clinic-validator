@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseOCDate } from '../lib/parse-date.js';
+import { parseOCDate } from '../parse-date.js';
 
 describe('parseOCDate', () => {
   it('parses "13 Dec 1905" to ISO date', () => {

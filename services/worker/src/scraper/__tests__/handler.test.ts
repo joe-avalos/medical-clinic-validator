@@ -4,23 +4,23 @@ import type { RawCompanyRecord, VerificationJobMessage } from '@medical-validato
 // Mock dependencies before importing handler
 const mockGetCached = vi.fn();
 const mockSetCached = vi.fn();
-vi.mock('../clients/redis.js', () => ({
+vi.mock('../../shared/redis.js', () => ({
   getCachedScraperResult: mockGetCached,
   setCachedScraperResult: mockSetCached,
 }));
 
 const mockUpdateJobStatus = vi.fn();
-vi.mock('../clients/dynamodb.js', () => ({
+vi.mock('../../shared/dynamodb.js', () => ({
   updateJobStatus: mockUpdateJobStatus,
 }));
 
 const mockScrapeOpenCorporates = vi.fn();
-vi.mock('../clients/opencorporates.js', () => ({
+vi.mock('../opencorporates.js', () => ({
   scrapeOpenCorporates: mockScrapeOpenCorporates,
 }));
 
 const mockSendMessage = vi.fn();
-vi.mock('../lib/sqs.js', () => ({
+vi.mock('../../shared/sqs.js', () => ({
   sendMessage: mockSendMessage,
 }));
 
@@ -52,7 +52,7 @@ describe('handleScraperMessage', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     // Dynamic import to pick up mocks
-    const mod = await import('../workers/scraper.js');
+    const mod = await import('../handler.js');
     handleScraperMessage = mod.handleScraperMessage;
   });
 

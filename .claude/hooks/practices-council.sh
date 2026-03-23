@@ -4,6 +4,13 @@ set -euo pipefail
 # Best Practices Council — Reviews file changes for code quality.
 # Fires on Stop event. No-ops if no files were changed.
 
+# Load API key from .env if not already in environment
+if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -f "${CLAUDE_PROJECT_DIR}/.env" ]; then
+  set -a
+  source "${CLAUDE_PROJECT_DIR}/.env"
+  set +a
+fi
+
 DIFF=$(cd "$CLAUDE_PROJECT_DIR" && git diff --unified=3 2>/dev/null || true)
 STAGED=$(cd "$CLAUDE_PROJECT_DIR" && git diff --cached --unified=3 2>/dev/null || true)
 UNTRACKED=$(cd "$CLAUDE_PROJECT_DIR" && git ls-files --others --exclude-standard 2>/dev/null || true)

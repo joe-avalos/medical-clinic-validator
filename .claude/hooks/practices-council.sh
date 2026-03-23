@@ -34,13 +34,12 @@ fi
 
 ALL_CHANGES="${DIFF}${STAGED}${UNTRACKED_CONTENT}"
 
-# If no uncommitted changes, check the last commit (catches just-committed work)
+# If no uncommitted changes, check if the last commit hasn't been reviewed yet
 if [ -z "$ALL_CHANGES" ]; then
-  LAST_COMMIT_AGE=$(cd "$CLAUDE_PROJECT_DIR" && git log -1 --format=%ct 2>/dev/null || echo "0")
-  NOW=$(date +%s)
-  SECONDS_AGO=$((NOW - LAST_COMMIT_AGE))
-  # Only review if the last commit was within the last 60 seconds
-  if [ "$SECONDS_AGO" -lt 60 ]; then
+  TRACKER="${CLAUDE_PROJECT_DIR}/.claude/councils/.last-reviewed-practices"
+  CURRENT_COMMIT=$(cd "$CLAUDE_PROJECT_DIR" && git rev-parse HEAD 2>/dev/null || echo "")
+  LAST_REVIEWED=$(cat "$TRACKER" 2>/dev/null || echo "")
+  if [ -n "$CURRENT_COMMIT" ] && [ "$CURRENT_COMMIT" != "$LAST_REVIEWED" ]; then
     ALL_CHANGES=$(cd "$CLAUDE_PROJECT_DIR" && git diff HEAD~1..HEAD --unified=3 2>/dev/null || true)
   fi
 fi
@@ -91,6 +90,13 @@ if [ "$RESPONSE" = "API_ERROR" ]; then
 fi
 
 REVIEW=$(echo "$RESPONSE" | jq -r '.content[0].text // "NO_ISSUES"' 2>/dev/null || echo "NO_ISSUES")
+
+# Mark commit as reviewed
+CURRENT_COMMIT=$(cd "$CLAUDE_PROJECT_DIR" && git rev-parse HEAD 2>/dev/null || echo "")
+if [ -n "$CURRENT_COMMIT" ]; then
+  mkdir -p "${CLAUDE_PROJECT_DIR}/.claude/councils"
+  echo "$CURRENT_COMMIT" > "${CLAUDE_PROJECT_DIR}/.claude/councils/.last-reviewed-practices"
+fi
 
 if [ "$REVIEW" = "NO_ISSUES" ]; then
   exit 0

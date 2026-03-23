@@ -17,6 +17,7 @@ Resources:
         - { AttributeName: sk, AttributeType: S }
         - { AttributeName: riskLevel, AttributeType: S }
         - { AttributeName: validatedAt, AttributeType: S }
+        - { AttributeName: jobId, AttributeType: S }
       KeySchema:
         - { AttributeName: pk, KeyType: HASH }
         - { AttributeName: sk, KeyType: RANGE }
@@ -25,6 +26,11 @@ Resources:
           KeySchema:
             - { AttributeName: riskLevel, KeyType: HASH }
             - { AttributeName: validatedAt, KeyType: RANGE }
+          Projection:
+            ProjectionType: ALL
+        - IndexName: jobId-index
+          KeySchema:
+            - { AttributeName: jobId, KeyType: HASH }
           Projection:
             ProjectionType: ALL
       TimeToLiveSpecification:

@@ -4,6 +4,7 @@ import {
   PutCommand,
   GetCommand,
   QueryCommand,
+  ScanCommand,
 } from '@aws-sdk/lib-dynamodb';
 import type { JobStatus } from '@medical-validator/shared';
 
@@ -73,28 +74,32 @@ export interface QueryRecordsInput {
 export async function queryRecords(
   input: QueryRecordsInput,
 ): Promise<{ records: Record<string, unknown>[]; total: number; nextCursor?: string }> {
-  const params: Record<string, unknown> = {
-    TableName: VERIFICATIONS_TABLE,
-    Limit: input.limit,
-  };
+  const exclusiveStartKey = input.cursor
+    ? JSON.parse(Buffer.from(input.cursor, 'base64url').toString())
+    : undefined;
 
-  if (input.cursor) {
-    (params as any).ExclusiveStartKey = JSON.parse(
-      Buffer.from(input.cursor, 'base64url').toString(),
+  let result;
+  if (input.riskLevel) {
+    result = await docClient.send(
+      new QueryCommand({
+        TableName: VERIFICATIONS_TABLE,
+        IndexName: 'riskLevel-validatedAt-index',
+        KeyConditionExpression: 'riskLevel = :rl',
+        ExpressionAttributeValues: { ':rl': input.riskLevel },
+        Limit: input.limit,
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+  } else {
+    result = await docClient.send(
+      new ScanCommand({
+        TableName: VERIFICATIONS_TABLE,
+        Limit: input.limit,
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
     );
   }
 
-  if (input.riskLevel) {
-    (params as any).IndexName = 'riskLevel-validatedAt-index';
-    (params as any).KeyConditionExpression = 'riskLevel = :rl';
-    (params as any).ExpressionAttributeValues = { ':rl': input.riskLevel };
-  }
-
-  const command = input.riskLevel
-    ? new QueryCommand(params as any)
-    : new QueryCommand({ ...params, TableName: VERIFICATIONS_TABLE } as any);
-
-  const result = await docClient.send(command);
   const records = (result.Items ?? []) as Record<string, unknown>[];
 
   let nextCursor: string | undefined;

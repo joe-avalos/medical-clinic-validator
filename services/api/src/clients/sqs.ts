@@ -17,7 +17,8 @@ export async function sendToVerificationQueue(
     new SendMessageCommand({
       QueueUrl: VERIFICATION_QUEUE_URL,
       MessageBody: JSON.stringify(message),
-      MessageGroupId: message.normalizedName,
+      MessageGroupId: message.normalizedName.replace(/[^a-zA-Z0-9._-]/g, '_'),
+      MessageDeduplicationId: message.jobId.slice(0, 128),
     }),
   );
 }

@@ -16,6 +16,9 @@ services/worker/smoke-test.ts
 .env
 .oc-cookies.json
 
+# Coverage
+coverage/
+
 # Council logs
 .claude/councils/
 

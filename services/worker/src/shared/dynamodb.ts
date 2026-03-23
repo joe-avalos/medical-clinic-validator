@@ -1,6 +1,6 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
-import { DynamoDBDocumentClient, UpdateCommand } from '@aws-sdk/lib-dynamodb';
-import type { JobStatus } from '@medical-validator/shared';
+import { DynamoDBDocumentClient, UpdateCommand, PutCommand } from '@aws-sdk/lib-dynamodb';
+import type { JobStatus, VerificationRecord } from '@medical-validator/shared';
 
 const client = new DynamoDBClient({
   endpoint: process.env.DYNAMODB_ENDPOINT || 'http://localhost:4566',
@@ -10,6 +10,7 @@ const client = new DynamoDBClient({
 const docClient = DynamoDBDocumentClient.from(client);
 
 const JOBS_TABLE = process.env.DYNAMODB_TABLE_JOBS || 'jobs';
+const VERIFICATIONS_TABLE = process.env.DYNAMODB_TABLE_VERIFICATIONS || 'verifications';
 
 export async function updateJobStatus(
   jobId: string,
@@ -30,6 +31,17 @@ export async function updateJobStatus(
         ':now': now,
         ...(errorMessage ? { ':err': errorMessage } : {}),
       },
+    }),
+  );
+}
+
+export async function putVerificationRecord(
+  record: VerificationRecord,
+): Promise<void> {
+  await docClient.send(
+    new PutCommand({
+      TableName: VERIFICATIONS_TABLE,
+      Item: record,
     }),
   );
 }

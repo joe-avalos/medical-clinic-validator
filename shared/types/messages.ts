@@ -125,6 +125,7 @@ export const VerificationRecordSchema = z.object({
   aiSummary: z.string(),
   confidence: z.string(),
   cachedResult: z.boolean(),
+  scope: Scope,
   rawSourceData: z.array(RawCompanyRecordSchema),
   jobStatus: z.literal('completed'),
   createdAt: z.string().datetime(),

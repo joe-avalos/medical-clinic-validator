@@ -1,8 +1,9 @@
 import Redis from 'ioredis';
-import type { RawCompanyRecord } from '@medical-validator/shared';
+import type { RawCompanyRecord, ValidationResult } from '@medical-validator/shared';
 
 const CACHE_TTL = 86400; // 24 hours
 const KEY_PREFIX = 'scraper:company:';
+const VALIDATION_KEY_PREFIX = 'validation:company:';
 
 let redis: Redis | null = null;
 
@@ -34,6 +35,18 @@ export async function setCachedScraperResult(
   await getClient().set(
     `${KEY_PREFIX}${normalizedName}`,
     JSON.stringify(companies),
+    'EX',
+    CACHE_TTL,
+  );
+}
+
+export async function setCachedValidation(
+  normalizedName: string,
+  result: { validation: ValidationResult; validatedAt: string },
+): Promise<void> {
+  await getClient().set(
+    `${VALIDATION_KEY_PREFIX}${normalizedName}`,
+    JSON.stringify(result),
     'EX',
     CACHE_TTL,
   );

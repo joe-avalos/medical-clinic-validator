@@ -31,15 +31,15 @@ async function getBrowser(): Promise<Browser> {
 function loadCookiesFromFile(): CookieParam[] {
   try {
     const raw = readFileSync(COOKIES_PATH, 'utf-8');
-    const cookies = JSON.parse(raw) as Array<{ name: string; value: string; domain: string }>;
-    return cookies.map((c) => ({
-      name: c.name,
-      value: c.value,
-      domain: c.domain,
-      path: '/',
-      httpOnly: true,
-      secure: true,
-    }));
+    const cookies = JSON.parse(raw) as Array<{ name: string; value: string; domain: string; path?: string }>;
+    return cookies
+      .filter((c) => typeof c.name === 'string' && typeof c.value === 'string' && typeof c.domain === 'string')
+      .map((c) => ({
+        name: c.name,
+        value: c.value,
+        domain: c.domain,
+        path: c.path || '/',
+      }));
   } catch (err) {
     throw new Error(`Failed to load cookies from ${COOKIES_PATH}: ${(err as Error).message}`);
   }

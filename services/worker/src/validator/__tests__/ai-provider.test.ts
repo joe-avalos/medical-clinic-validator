@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { RawCompanyRecord, ValidationResult } from '@medical-validator/shared';
 
+const mockCreate = vi.fn();
+vi.mock('@anthropic-ai/sdk', () => ({
+  default: class {
+    messages = { create: mockCreate };
+  },
+}));
+
 const SAMPLE_COMPANIES: RawCompanyRecord[] = [
   {
     companyNumber: '0f23674b',
@@ -70,19 +77,9 @@ describe('createAIProvider', () => {
 });
 
 describe('AnthropicProvider', () => {
-  const mockCreate = vi.fn();
-
   beforeEach(() => {
     vi.resetModules();
-    vi.mock('@anthropic-ai/sdk', () => ({
-      default: class {
-        messages = { create: mockCreate };
-      },
-    }));
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
+    mockCreate.mockReset();
   });
 
   it('returns valid ValidationResult on successful API call', async () => {

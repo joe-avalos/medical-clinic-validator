@@ -1,0 +1,31 @@
+services:
+  localstack:
+    image: localstack/localstack:3
+    ports:
+      - "4566:4566"
+    environment:
+      SERVICES: sqs,dynamodb,apigateway,iam,cloudformation
+      EAGER_SERVICE_LOADING: 1
+    volumes:
+      - ./infra/scripts/bootstrap.sh:/etc/localstack/init/ready.d/bootstrap.sh
+      - ./infra/cloudformation:/opt/cloudformation
+      - localstack_data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  localstack_data:

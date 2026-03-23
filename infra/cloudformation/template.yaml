@@ -1,0 +1,28 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: |
+  Medical Clinic Legal Validator — Root stack reference.
+
+  NOTE: LocalStack does not reliably support nested CloudFormation stacks.
+  In local dev, each stack under stacks/ is deployed individually by bootstrap.sh.
+
+  In production, this template would orchestrate nested stacks via S3-hosted templates.
+  For now, it serves as documentation of the full resource set.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: local
+    AllowedValues: [local, prod]
+  Region:
+    Type: String
+    Default: us-east-1
+  AccountId:
+    Type: String
+    Default: "000000000000"
+
+# Individual stacks deployed by bootstrap.sh:
+#   1. stacks/dynamodb.yaml   — verifications + jobs tables
+#   2. stacks/sqs.yaml        — 3x FIFO queues + DLQs
+#   3. stacks/iam.yaml        — least-privilege roles per service
+#   4. stacks/api-gateway.yaml — REST API + JWT authorizer
+#   5. stacks/elasticache.yaml — Redis (prod only, local uses Docker)

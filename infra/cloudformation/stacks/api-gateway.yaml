@@ -1,0 +1,60 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: API Gateway REST API with JWT authorizer for Medical Clinic Legal Validator
+
+Parameters:
+  Environment:
+    Type: String
+    Default: local
+
+Resources:
+  MedicalValidatorApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: medical-validator-api
+      Description: Medical Clinic Legal Validator REST API
+
+  JwtAuthorizer:
+    Type: AWS::ApiGateway::Authorizer
+    Properties:
+      Name: jwt-authorizer
+      Type: TOKEN
+      RestApiId: !Ref MedicalValidatorApi
+      IdentitySource: method.request.header.Authorization
+
+  # --- /verify resource ---
+  VerifyResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref MedicalValidatorApi
+      ParentId: !GetAtt MedicalValidatorApi.RootResourceId
+      PathPart: verify
+
+  # --- /verify/{jobId} resource ---
+  VerifyJobResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref MedicalValidatorApi
+      ParentId: !Ref VerifyResource
+      PathPart: "{jobId}"
+
+  # --- /verify/{jobId}/status resource ---
+  VerifyJobStatusResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref MedicalValidatorApi
+      ParentId: !Ref VerifyJobResource
+      PathPart: status
+
+  # --- /records resource ---
+  RecordsResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref MedicalValidatorApi
+      ParentId: !GetAtt MedicalValidatorApi.RootResourceId
+      PathPart: records
+
+Outputs:
+  ApiId:
+    Value: !Ref MedicalValidatorApi
+  ApiRootResourceId:
+    Value: !GetAtt MedicalValidatorApi.RootResourceId

@@ -1,0 +1,14 @@
+[
+  {
+    "ParameterKey": "Environment",
+    "ParameterValue": "prod"
+  },
+  {
+    "ParameterKey": "Region",
+    "ParameterValue": "us-east-1"
+  },
+  {
+    "ParameterKey": "AccountId",
+    "ParameterValue": ""
+  }
+]

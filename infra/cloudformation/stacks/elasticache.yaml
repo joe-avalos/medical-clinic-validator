@@ -1,0 +1,32 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: ElastiCache Redis stub for Medical Clinic Legal Validator (local only — actual Redis runs via Docker Compose)
+
+Parameters:
+  Environment:
+    Type: String
+    Default: local
+
+# In LocalStack, ElastiCache is not fully supported.
+# Redis runs as a standalone Docker Compose service.
+# This template exists as a placeholder for production parity,
+# where a real AWS::ElastiCache::CacheCluster would be defined.
+
+Conditions:
+  IsProduction: !Not [!Equals [!Ref Environment, local]]
+
+Resources:
+  # Only created in production — LocalStack uses docker redis service
+  RedisCluster:
+    Type: AWS::ElastiCache::CacheCluster
+    Condition: IsProduction
+    Properties:
+      ClusterName: medical-validator-redis
+      Engine: redis
+      CacheNodeType: cache.t3.micro
+      NumCacheNodes: 1
+      Port: 6379
+
+Outputs:
+  RedisEndpoint:
+    Condition: IsProduction
+    Value: !GetAtt RedisCluster.RedisEndpoint.Address

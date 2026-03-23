@@ -1,0 +1,159 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: IAM roles and least-privilege policies for Medical Clinic Legal Validator
+
+Parameters:
+  Environment:
+    Type: String
+    Default: local
+  AccountId:
+    Type: String
+    Default: "000000000000"
+  Region:
+    Type: String
+    Default: us-east-1
+
+Resources:
+  # --- API Service Role ---
+  ApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: medical-validator-api-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ApiPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource:
+                  - !Sub "arn:aws:sqs:${Region}:${AccountId}:verification-queue.fifo"
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${Region}:${AccountId}:table/jobs"
+              - Effect: Allow
+                Action:
+                  - dynamodb:Query
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${Region}:${AccountId}:table/verifications"
+                  - !Sub "arn:aws:dynamodb:${Region}:${AccountId}:table/verifications/index/*"
+
+  # --- Scraper Worker Role ---
+  ScraperWorkerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: medical-validator-scraper-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ScraperPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource:
+                  - !Sub "arn:aws:sqs:${Region}:${AccountId}:verification-queue.fifo"
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource:
+                  - !Sub "arn:aws:sqs:${Region}:${AccountId}:validation-queue.fifo"
+              - Effect: Allow
+                Action:
+                  - dynamodb:UpdateItem
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${Region}:${AccountId}:table/jobs"
+
+  # --- AI Validator Worker Role ---
+  ValidatorWorkerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: medical-validator-validator-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ValidatorPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource:
+                  - !Sub "arn:aws:sqs:${Region}:${AccountId}:validation-queue.fifo"
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                Resource:
+                  - !Sub "arn:aws:sqs:${Region}:${AccountId}:storage-queue.fifo"
+
+  # --- Storage Worker Role ---
+  StorageWorkerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: medical-validator-storage-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: StoragePolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource:
+                  - !Sub "arn:aws:sqs:${Region}:${AccountId}:storage-queue.fifo"
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${Region}:${AccountId}:table/verifications"
+              - Effect: Allow
+                Action:
+                  - dynamodb:UpdateItem
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${Region}:${AccountId}:table/jobs"
+
+Outputs:
+  ApiRoleArn:
+    Value: !GetAtt ApiRole.Arn
+  ScraperWorkerRoleArn:
+    Value: !GetAtt ScraperWorkerRole.Arn
+  ValidatorWorkerRoleArn:
+    Value: !GetAtt ValidatorWorkerRole.Arn
+  StorageWorkerRoleArn:
+    Value: !GetAtt StorageWorkerRole.Arn

@@ -1,0 +1,79 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: SQS FIFO queues and DLQs for Medical Clinic Legal Validator
+
+Parameters:
+  Environment:
+    Type: String
+    Default: local
+
+Resources:
+  # --- Verification Queue (API → Scraper) ---
+  VerificationDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: verification-dlq.fifo
+      FifoQueue: true
+      MessageRetentionPeriod: 1209600  # 14 days
+
+  VerificationQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: verification-queue.fifo
+      FifoQueue: true
+      VisibilityTimeout: 30
+      ContentBasedDeduplication: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt VerificationDLQ.Arn
+        maxReceiveCount: 3
+
+  # --- Validation Queue (Scraper → AI Validator) ---
+  ValidationDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: validation-dlq.fifo
+      FifoQueue: true
+      MessageRetentionPeriod: 1209600
+
+  ValidationQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: validation-queue.fifo
+      FifoQueue: true
+      VisibilityTimeout: 60  # AI validation can take longer
+      ContentBasedDeduplication: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ValidationDLQ.Arn
+        maxReceiveCount: 3
+
+  # --- Storage Queue (AI Validator → Storage) ---
+  StorageDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: storage-dlq.fifo
+      FifoQueue: true
+      MessageRetentionPeriod: 1209600
+
+  StorageQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: storage-queue.fifo
+      FifoQueue: true
+      VisibilityTimeout: 30
+      ContentBasedDeduplication: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt StorageDLQ.Arn
+        maxReceiveCount: 3
+
+Outputs:
+  VerificationQueueUrl:
+    Value: !Ref VerificationQueue
+  VerificationQueueArn:
+    Value: !GetAtt VerificationQueue.Arn
+  ValidationQueueUrl:
+    Value: !Ref ValidationQueue
+  ValidationQueueArn:
+    Value: !GetAtt ValidationQueue.Arn
+  StorageQueueUrl:
+    Value: !Ref StorageQueue
+  StorageQueueArn:
+    Value: !GetAtt StorageQueue.Arn

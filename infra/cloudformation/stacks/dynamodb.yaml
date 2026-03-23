@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: DynamoDB tables for Medical Clinic Legal Validator
+
+Parameters:
+  Environment:
+    Type: String
+    Default: local
+
+Resources:
+  VerificationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: verifications
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: pk, AttributeType: S }
+        - { AttributeName: sk, AttributeType: S }
+        - { AttributeName: riskLevel, AttributeType: S }
+        - { AttributeName: validatedAt, AttributeType: S }
+      KeySchema:
+        - { AttributeName: pk, KeyType: HASH }
+        - { AttributeName: sk, KeyType: RANGE }
+      GlobalSecondaryIndexes:
+        - IndexName: riskLevel-validatedAt-index
+          KeySchema:
+            - { AttributeName: riskLevel, KeyType: HASH }
+            - { AttributeName: validatedAt, KeyType: RANGE }
+          Projection:
+            ProjectionType: ALL
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  JobsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: jobs
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: pk, AttributeType: S }
+        - { AttributeName: sk, AttributeType: S }
+      KeySchema:
+        - { AttributeName: pk, KeyType: HASH }
+        - { AttributeName: sk, KeyType: RANGE }
+
+Outputs:
+  VerificationsTableName:
+    Value: !Ref VerificationsTable
+  VerificationsTableArn:
+    Value: !GetAtt VerificationsTable.Arn
+  JobsTableName:
+    Value: !Ref JobsTable
+  JobsTableArn:
+    Value: !GetAtt JobsTable.Arn

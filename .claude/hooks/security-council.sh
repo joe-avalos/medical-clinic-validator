@@ -5,7 +5,7 @@ set -euo pipefail
 # Fires on Stop event. No-ops if no files were changed.
 
 # Drain stdin — hook system sends JSON on stdin which would be consumed by curl/source
-cat > /dev/null
+cat > /dev/null 2>/dev/null || true
 
 # Load API key from .env if not already in environment
 if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -f "${CLAUDE_PROJECT_DIR}/.env" ]; then
@@ -14,8 +14,8 @@ if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -f "${CLAUDE_PROJECT_DIR}/.env" ]; then
   set +a
 fi
 
-DIFF=$(cd "$CLAUDE_PROJECT_DIR" && git diff --unified=3 2>/dev/null || true)
-STAGED=$(cd "$CLAUDE_PROJECT_DIR" && git diff --cached --unified=3 2>/dev/null || true)
+DIFF=$(cd "$CLAUDE_PROJECT_DIR" && git diff --unified=3 -- ':!package-lock.json' 2>/dev/null || true)
+STAGED=$(cd "$CLAUDE_PROJECT_DIR" && git diff --cached --unified=3 -- ':!package-lock.json' 2>/dev/null || true)
 UNTRACKED=$(cd "$CLAUDE_PROJECT_DIR" && git ls-files --others --exclude-standard 2>/dev/null || true)
 
 # Collect untracked file contents (new files that aren't in git yet)
@@ -53,10 +53,10 @@ if [ -z "$ALL_CHANGES" ]; then
 fi
 
 # Truncate to avoid blowing up the API call
-ALL_CHANGES=$(echo "$ALL_CHANGES" | head -500)
+ALL_CHANGES=$(printf '%s' "$ALL_CHANGES" | head -500 || true)
 
 # Skip if this exact diff was already reviewed
-DIFF_HASH=$(echo "$ALL_CHANGES" | shasum -a 256 | cut -d' ' -f1)
+DIFF_HASH=$(printf '%s' "$ALL_CHANGES" | shasum -a 256 | cut -d' ' -f1)
 HASH_TRACKER="${CLAUDE_PROJECT_DIR}/.claude/councils/.last-diff-hash-security"
 LAST_HASH=$(cat "$HASH_TRACKER" 2>/dev/null || echo "")
 if [ "$DIFF_HASH" = "$LAST_HASH" ]; then

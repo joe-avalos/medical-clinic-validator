@@ -4,6 +4,9 @@ set -euo pipefail
 # Best Practices Council — Reviews file changes for code quality.
 # Fires on Stop event. No-ops if no files were changed.
 
+# Drain stdin — hook system sends JSON on stdin which would be consumed by curl/source
+cat > /dev/null
+
 # Load API key from .env if not already in environment
 if [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -f "${CLAUDE_PROJECT_DIR}/.env" ]; then
   set -a
@@ -83,7 +86,7 @@ RESPONSE=$(curl -s --max-time 30 "https://api.anthropic.com/v1/messages" \
     \"max_tokens\": 1024,
     \"system\": ${ESCAPED_SYSTEM},
     \"messages\": [{\"role\": \"user\", \"content\": ${ESCAPED_CHANGES}}]
-  }" 2>/dev/null || echo "API_ERROR")
+  }" </dev/null 2>/dev/null || echo "API_ERROR")
 
 if [ "$RESPONSE" = "API_ERROR" ]; then
   exit 0
@@ -112,7 +115,5 @@ echo -e "[$TIMESTAMP] commit:${COMMIT_SHORT}\n${REVIEW}\n---\n" >> "${LOG_DIR}/p
 # Issues found — block stop so Claude sees the feedback and can act on it
 jq -n --arg review "$REVIEW" '{
   "decision": "block",
-  "hookSpecificOutput": {
-    "additionalContext": ("[BEST PRACTICES COUNCIL REVIEW]\n" + $review + "\n\nAddress the above findings before proceeding.")
-  }
+  "reason": ("[BEST PRACTICES COUNCIL REVIEW]\n" + $review + "\n\nAddress the above findings before proceeding.")
 }'

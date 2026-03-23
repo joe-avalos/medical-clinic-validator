@@ -55,6 +55,16 @@ fi
 # Truncate to avoid blowing up the API call
 ALL_CHANGES=$(echo "$ALL_CHANGES" | head -500)
 
+# Skip if this exact diff was already reviewed
+DIFF_HASH=$(echo "$ALL_CHANGES" | shasum -a 256 | cut -d' ' -f1)
+HASH_TRACKER="${CLAUDE_PROJECT_DIR}/.claude/councils/.last-diff-hash-practices"
+LAST_HASH=$(cat "$HASH_TRACKER" 2>/dev/null || echo "")
+if [ "$DIFF_HASH" = "$LAST_HASH" ]; then
+  exit 0
+fi
+mkdir -p "${CLAUDE_PROJECT_DIR}/.claude/councils"
+echo "$DIFF_HASH" > "$HASH_TRACKER"
+
 if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
   echo '{"decision":"block","hookSpecificOutput":{"additionalContext":"[Best Practices Council] WARNING: ANTHROPIC_API_KEY not set — practices review skipped."}}'
   exit 0

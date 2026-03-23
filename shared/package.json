@@ -2,7 +2,11 @@
   "name": "@medical-validator/shared",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "main": "types/index.ts",
+  "exports": {
+    ".": "./types/index.ts"
+  },
   "dependencies": {
     "zod": "^3.23.0"
   },

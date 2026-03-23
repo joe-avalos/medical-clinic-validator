@@ -52,17 +52,18 @@ export async function getJobStatus(jobId: string): Promise<Record<string, unknow
   return (result.Item as Record<string, unknown>) ?? null;
 }
 
-export async function getVerificationResult(jobId: string): Promise<Record<string, unknown> | null> {
+export async function getVerificationResults(jobId: string): Promise<Record<string, unknown>[]> {
   const result = await docClient.send(
     new QueryCommand({
       TableName: VERIFICATIONS_TABLE,
-      IndexName: 'jobId-index',
-      KeyConditionExpression: 'jobId = :jid',
-      ExpressionAttributeValues: { ':jid': jobId },
-      Limit: 1,
+      KeyConditionExpression: 'pk = :pk AND begins_with(sk, :prefix)',
+      ExpressionAttributeValues: {
+        ':pk': `JOB#${jobId}`,
+        ':prefix': 'RESULT#',
+      },
     }),
   );
-  return (result.Items?.[0] as Record<string, unknown>) ?? null;
+  return (result.Items ?? []) as Record<string, unknown>[];
 }
 
 export interface QueryRecordsInput {
@@ -74,9 +75,14 @@ export interface QueryRecordsInput {
 export async function queryRecords(
   input: QueryRecordsInput,
 ): Promise<{ records: Record<string, unknown>[]; total: number; nextCursor?: string }> {
-  const exclusiveStartKey = input.cursor
-    ? JSON.parse(Buffer.from(input.cursor, 'base64url').toString())
-    : undefined;
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+  if (input.cursor) {
+    try {
+      exclusiveStartKey = JSON.parse(Buffer.from(input.cursor, 'base64url').toString());
+    } catch {
+      throw new Error('Invalid cursor format');
+    }
+  }
 
   let result;
   if (input.riskLevel) {

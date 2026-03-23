@@ -10,6 +10,8 @@ const REDACTED_FIELDS = [
   'incorporationDate',
   'confidence',
   'cachedResult',
+  'cachedFromJobId',
+  'originalValidatedAt',
   'jobId',
   'pk',
   'sk',
@@ -55,7 +57,7 @@ recordsRouter.get('/', async (req: Request, res: Response) => {
       cursor: cursor as string | undefined,
     });
 
-    const user = (req as any).user as JwtClaims;
+    const user = req.user as JwtClaims;
     const records =
       user.scope === 'external'
         ? result.records.map(redactRecord)

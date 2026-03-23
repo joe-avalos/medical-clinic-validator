@@ -2,8 +2,7 @@ import * as cheerio from 'cheerio';
 import type { RawCompanyRecord } from '@medical-validator/shared';
 import { parseOCDate } from './parse-date.js';
 
-const MAX_RESULTS = 5;
-const OC_BASE = 'https://opencorporates.com';
+const OC_BASE = process.env.OC_BASE_URL || 'https://opencorporates.com';
 const STATUS_CLASSES = ['active', 'inactive', 'dissolved', 'suspended', 'terminated', 'merged'];
 
 /**
@@ -13,9 +12,7 @@ export function parseSearchResults(html: string): RawCompanyRecord[] {
   const $ = cheerio.load(html);
   const records: RawCompanyRecord[] = [];
 
-  $('ul#companies > li.search-result').each((i, el) => {
-    if (i >= MAX_RESULTS) return false;
-
+  $('ul#companies > li.search-result').each((_i, el) => {
     const $el = $(el);
     const $link = $el.find('a.company_search_result');
 

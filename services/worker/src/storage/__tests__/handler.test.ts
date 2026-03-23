@@ -7,15 +7,15 @@ import type {
 
 // Mock dependencies before importing handler
 const mockUpdateJobStatus = vi.fn();
-const mockPutVerificationRecord = vi.fn();
+const mockPutVerificationRecords = vi.fn();
 vi.mock('../../shared/dynamodb.js', () => ({
   updateJobStatus: mockUpdateJobStatus,
-  putVerificationRecord: mockPutVerificationRecord,
+  putVerificationRecords: mockPutVerificationRecords,
 }));
 
-const mockSetCachedValidation = vi.fn();
+const mockSetCachedJobId = vi.fn();
 vi.mock('../../shared/redis.js', () => ({
-  setCachedValidation: mockSetCachedValidation,
+  setCachedJobId: mockSetCachedJobId,
 }));
 
 const FAKE_COMPANIES: RawCompanyRecord[] = [
@@ -50,7 +50,7 @@ const VALID_MESSAGE: ValidationResultMessage = {
   normalizedName: 'mayo health system',
   scope: 'internal',
   cachedResult: false,
-  validation: VALID_RESULT,
+  validations: [VALID_RESULT],
   rawSourceData: FAKE_COMPANIES,
   validatedAt: '2026-03-22T10:00:00Z',
 };
@@ -68,62 +68,78 @@ describe('handleStorageMessage', () => {
     await expect(handleStorageMessage({ invalid: true })).rejects.toThrow();
   });
 
-  // ── DynamoDB: verification record ──────────────────────────────────
+  // ── DynamoDB: verification records ──────────────────────────────────
 
-  it('writes verification record to DynamoDB', async () => {
+  it('writes individual verification records to DynamoDB', async () => {
     await handleStorageMessage(VALID_MESSAGE);
 
-    expect(mockPutVerificationRecord).toHaveBeenCalledWith(
-      expect.objectContaining({
-        pk: 'COMPANY#mayo health system',
-        sk: 'JOB#job-001',
-        jobId: 'job-001',
-        companyName: 'MAYO HEALTH SYSTEM',
-        normalizedName: 'mayo health system',
-        jurisdiction: 'us_mn',
-        registrationNumber: '0f23674b',
-        incorporationDate: '1905-12-13',
-        legalStatus: 'Active',
-        standardizedAddress: '211 S Newton, Albert Lea, MN, 56007',
-        providerType: 'Health System',
-        riskLevel: 'LOW',
-        riskFlags: [],
-        aiSummary: 'Entity is actively registered in Minnesota.',
-        confidence: 'HIGH',
-        cachedResult: false,
-        jobStatus: 'completed',
-        rawSourceData: FAKE_COMPANIES,
-        validatedAt: '2026-03-22T10:00:00Z',
-      }),
+    expect(mockPutVerificationRecords).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          pk: 'JOB#job-001',
+          sk: 'RESULT#0f23674b',
+          jobId: 'job-001',
+          companyNumber: '0f23674b',
+          companyName: 'MAYO HEALTH SYSTEM',
+          normalizedName: 'mayo health system',
+          jurisdiction: 'us_mn',
+          registrationNumber: '0f23674b',
+          legalStatus: 'Active',
+          riskLevel: 'LOW',
+          cachedResult: false,
+          cachedFromJobId: null,
+          originalValidatedAt: null,
+          jobStatus: 'completed',
+          validatedAt: '2026-03-22T10:00:00Z',
+        }),
+      ]),
     );
   });
 
-  it('sets pk to COMPANY#<normalizedName>', async () => {
-    await handleStorageMessage(VALID_MESSAGE);
-    const record = mockPutVerificationRecord.mock.calls[0][0];
-    expect(record.pk).toBe('COMPANY#mayo health system');
+  it('writes one record per validation result', async () => {
+    const secondResult: ValidationResult = {
+      ...VALID_RESULT,
+      companyName: 'MAYO CLINIC JACKSONVILLE',
+      registrationNumber: 'xyz-7890',
+      jurisdiction: 'us_fl',
+    };
+    const multiMessage: ValidationResultMessage = {
+      ...VALID_MESSAGE,
+      validations: [VALID_RESULT, secondResult],
+      rawSourceData: [
+        ...FAKE_COMPANIES,
+        { ...FAKE_COMPANIES[0], companyNumber: 'xyz-7890', name: 'MAYO CLINIC JACKSONVILLE' },
+      ],
+    };
+
+    await handleStorageMessage(multiMessage);
+
+    const records = mockPutVerificationRecords.mock.calls[0][0];
+    expect(records).toHaveLength(2);
+    expect(records[0].sk).toBe('RESULT#0f23674b');
+    expect(records[1].sk).toBe('RESULT#xyz-7890');
   });
 
-  it('sets sk to JOB#<jobId>', async () => {
+  it('stores individual company rawApiSnapshot (not array)', async () => {
     await handleStorageMessage(VALID_MESSAGE);
-    const record = mockPutVerificationRecord.mock.calls[0][0];
-    expect(record.sk).toBe('JOB#job-001');
+
+    const records = mockPutVerificationRecords.mock.calls[0][0];
+    expect(records[0].rawSourceData).toEqual({ classes: ['active'] });
   });
 
   it('sets TTL to 90 days from now', async () => {
     await handleStorageMessage(VALID_MESSAGE);
-    const record = mockPutVerificationRecord.mock.calls[0][0];
+    const records = mockPutVerificationRecords.mock.calls[0][0];
     const now = Math.floor(Date.now() / 1000);
     const ninetyDays = 90 * 24 * 60 * 60;
-    // TTL should be within 5 seconds of expected value
-    expect(record.ttl).toBeGreaterThanOrEqual(now + ninetyDays - 5);
-    expect(record.ttl).toBeLessThanOrEqual(now + ninetyDays + 5);
+    expect(records[0].ttl).toBeGreaterThanOrEqual(now + ninetyDays - 5);
+    expect(records[0].ttl).toBeLessThanOrEqual(now + ninetyDays + 5);
   });
 
   it('includes createdAt as ISO timestamp', async () => {
     await handleStorageMessage(VALID_MESSAGE);
-    const record = mockPutVerificationRecord.mock.calls[0][0];
-    expect(record.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+    const records = mockPutVerificationRecords.mock.calls[0][0];
+    expect(records[0].createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
   // ── DynamoDB: job status update ────────────────────────────────────
@@ -136,15 +152,13 @@ describe('handleStorageMessage', () => {
 
   // ── Redis cache ────────────────────────────────────────────────────
 
-  it('caches the validated result in Redis', async () => {
+  it('caches query→jobId mapping in Redis', async () => {
     await handleStorageMessage(VALID_MESSAGE);
 
-    expect(mockSetCachedValidation).toHaveBeenCalledWith(
+    expect(mockSetCachedJobId).toHaveBeenCalledWith(
       'mayo health system',
-      expect.objectContaining({
-        validation: VALID_RESULT,
-        validatedAt: '2026-03-22T10:00:00Z',
-      }),
+      'job-001',
+      expect.any(String),
     );
   });
 
@@ -152,23 +166,23 @@ describe('handleStorageMessage', () => {
     const cachedMsg = { ...VALID_MESSAGE, cachedResult: true };
     await handleStorageMessage(cachedMsg);
 
-    expect(mockSetCachedValidation).not.toHaveBeenCalled();
+    expect(mockSetCachedJobId).not.toHaveBeenCalled();
   });
 
   // ── Scope passthrough ──────────────────────────────────────────────
 
-  it('preserves external scope in verification record', async () => {
+  it('preserves external scope in verification records', async () => {
     const externalMsg = { ...VALID_MESSAGE, scope: 'external' as const };
     await handleStorageMessage(externalMsg);
 
-    const record = mockPutVerificationRecord.mock.calls[0][0];
-    expect(record.scope).toBe('external');
+    const records = mockPutVerificationRecords.mock.calls[0][0];
+    expect(records[0].scope).toBe('external');
   });
 
   // ── Error handling ─────────────────────────────────────────────────
 
   it('updates job status to failed when DynamoDB write fails', async () => {
-    mockPutVerificationRecord.mockRejectedValue(new Error('DynamoDB throttled'));
+    mockPutVerificationRecords.mockRejectedValue(new Error('DynamoDB throttled'));
 
     await expect(handleStorageMessage(VALID_MESSAGE)).rejects.toThrow();
 
@@ -180,11 +194,11 @@ describe('handleStorageMessage', () => {
   });
 
   it('still writes to DynamoDB when Redis cache fails', async () => {
-    mockSetCachedValidation.mockRejectedValue(new Error('Redis connection refused'));
+    mockSetCachedJobId.mockRejectedValue(new Error('Redis connection refused'));
 
     await handleStorageMessage(VALID_MESSAGE);
 
-    expect(mockPutVerificationRecord).toHaveBeenCalled();
+    expect(mockPutVerificationRecords).toHaveBeenCalled();
     expect(mockUpdateJobStatus).toHaveBeenCalledWith('job-001', 'completed');
   });
 });

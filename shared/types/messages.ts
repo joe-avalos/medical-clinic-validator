@@ -86,7 +86,7 @@ export const ValidationResultMessageSchema = z.object({
   normalizedName: z.string(),
   scope: Scope,
   cachedResult: z.boolean(),
-  validation: ValidationResultSchema,
+  validations: z.array(ValidationResultSchema),
   validatedAt: z.string().datetime(),
   rawSourceData: z.array(RawCompanyRecordSchema),
 });
@@ -107,11 +107,12 @@ export const JobStatusRecordSchema = z.object({
 });
 export type JobStatusRecord = z.infer<typeof JobStatusRecordSchema>;
 
-// Verifications table — written by Storage
+// Verifications table — written by Storage (one row per company per job)
 export const VerificationRecordSchema = z.object({
-  pk: z.string(),
-  sk: z.string(),
+  pk: z.string(),                                // JOB#<jobId>
+  sk: z.string(),                                // RESULT#<companyNumber>
   jobId: z.string(),
+  companyNumber: z.string(),
   companyName: z.string(),
   normalizedName: z.string(),
   jurisdiction: z.string(),
@@ -125,8 +126,10 @@ export const VerificationRecordSchema = z.object({
   aiSummary: z.string(),
   confidence: z.string(),
   cachedResult: z.boolean(),
+  cachedFromJobId: z.string().nullable(),        // original jobId if cached
+  originalValidatedAt: z.string().nullable(),    // when original validation ran
   scope: Scope,
-  rawSourceData: z.array(RawCompanyRecordSchema),
+  rawSourceData: z.record(z.unknown()),          // individual company snapshot
   jobStatus: z.literal('completed'),
   createdAt: z.string().datetime(),
   validatedAt: z.string().datetime(),
@@ -139,7 +142,7 @@ export type VerificationRecord = z.infer<typeof VerificationRecordSchema>;
 // GET /records — external scope gets redacted fields
 export type RedactedVerificationRecord = Omit<
   VerificationRecord,
-  'registrationNumber' | 'incorporationDate' | 'confidence' | 'cachedResult' | 'jobId' | 'pk' | 'sk' | 'rawSourceData'
+  'registrationNumber' | 'incorporationDate' | 'confidence' | 'cachedResult' | 'cachedFromJobId' | 'originalValidatedAt' | 'jobId' | 'pk' | 'sk' | 'rawSourceData'
 >;
 
 // POST /verify request
@@ -160,7 +163,7 @@ export interface VerifyResponse {
 export interface JobStatusResponse {
   jobId: string;
   status: JobStatus;
-  result?: VerificationRecord;
+  results?: VerificationRecord[];
   errorMessage?: string;
 }
 

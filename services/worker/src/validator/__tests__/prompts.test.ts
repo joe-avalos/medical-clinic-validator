@@ -41,31 +41,20 @@ describe('buildUserPrompt', () => {
     expect(prompt).toContain('us_mn');
   });
 
-  it('includes risk level rules', () => {
-    const prompt = buildUserPrompt(SAMPLE_COMPANIES);
+  it('includes risk level rules in system prompt', () => {
+    const prompt = buildSystemPrompt();
     expect(prompt).toContain('LOW');
     expect(prompt).toContain('MEDIUM');
     expect(prompt).toContain('HIGH');
     expect(prompt).toContain('UNKNOWN');
   });
 
-  it('includes expected response shape fields', () => {
+  it('asks for a single JSON object', () => {
     const prompt = buildUserPrompt(SAMPLE_COMPANIES);
-    expect(prompt).toContain('companyName');
-    expect(prompt).toContain('riskLevel');
-    expect(prompt).toContain('riskFlags');
-    expect(prompt).toContain('aiSummary');
-    expect(prompt).toContain('confidence');
-    expect(prompt).toContain('standardizedAddress');
-    expect(prompt).toContain('providerType');
+    expect(prompt).toContain('single JSON object');
   });
 
-  it('handles empty companies array', () => {
-    const prompt = buildUserPrompt([]);
-    expect(prompt).toContain('[]');
-  });
-
-  it('handles multiple companies', () => {
+  it('only includes the first company record', () => {
     const multi: RawCompanyRecord[] = [
       ...SAMPLE_COMPANIES,
       {
@@ -79,6 +68,6 @@ describe('buildUserPrompt', () => {
     ];
     const prompt = buildUserPrompt(multi);
     expect(prompt).toContain('MAYO HEALTH SYSTEM');
-    expect(prompt).toContain('MAYO CLINIC JACKSONVILLE');
+    expect(prompt).not.toContain('MAYO CLINIC JACKSONVILLE');
   });
 });

@@ -1,9 +1,7 @@
 import Redis from 'ioredis';
-import type { RawCompanyRecord, ValidationResult } from '@medical-validator/shared';
 
 const CACHE_TTL = 86400; // 24 hours
-const KEY_PREFIX = 'scraper:company:';
-const VALIDATION_KEY_PREFIX = 'validation:company:';
+const QUERY_KEY_PREFIX = 'query:job:';
 
 let redis: Redis | null = null;
 
@@ -20,33 +18,27 @@ function getClient(): Redis {
   return redis;
 }
 
-export async function getCachedScraperResult(
+export interface CachedJobRef {
+  jobId: string;
+  createdAt: string;
+}
+
+export async function getCachedJobId(
   normalizedName: string,
-): Promise<RawCompanyRecord[] | null> {
-  const raw = await getClient().get(`${KEY_PREFIX}${normalizedName}`);
+): Promise<CachedJobRef | null> {
+  const raw = await getClient().get(`${QUERY_KEY_PREFIX}${normalizedName}`);
   if (!raw) return null;
-  return JSON.parse(raw) as RawCompanyRecord[];
+  return JSON.parse(raw) as CachedJobRef;
 }
 
-export async function setCachedScraperResult(
+export async function setCachedJobId(
   normalizedName: string,
-  companies: RawCompanyRecord[],
+  jobId: string,
+  createdAt: string,
 ): Promise<void> {
   await getClient().set(
-    `${KEY_PREFIX}${normalizedName}`,
-    JSON.stringify(companies),
-    'EX',
-    CACHE_TTL,
-  );
-}
-
-export async function setCachedValidation(
-  normalizedName: string,
-  result: { validation: ValidationResult; validatedAt: string },
-): Promise<void> {
-  await getClient().set(
-    `${VALIDATION_KEY_PREFIX}${normalizedName}`,
-    JSON.stringify(result),
+    `${QUERY_KEY_PREFIX}${normalizedName}`,
+    JSON.stringify({ jobId, createdAt }),
     'EX',
     CACHE_TTL,
   );

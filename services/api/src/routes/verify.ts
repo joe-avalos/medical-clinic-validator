@@ -4,9 +4,30 @@ import { VerifyRequestSchema } from '@medical-validator/shared';
 import type { JwtClaims } from '@medical-validator/shared';
 import { createJob } from '../clients/dynamodb.js';
 import { sendToVerificationQueue } from '../clients/sqs.js';
-import { getJobStatus, getVerificationResult } from '../clients/dynamodb.js';
+import { getJobStatus, getVerificationResults } from '../clients/dynamodb.js';
 
 export const verifyRouter = Router();
+
+const REDACTED_FIELDS = [
+  'registrationNumber',
+  'incorporationDate',
+  'confidence',
+  'cachedResult',
+  'cachedFromJobId',
+  'originalValidatedAt',
+  'jobId',
+  'pk',
+  'sk',
+  'rawSourceData',
+];
+
+function redactRecord(record: Record<string, unknown>): Record<string, unknown> {
+  const redacted = { ...record };
+  for (const field of REDACTED_FIELDS) {
+    delete redacted[field];
+  }
+  return redacted;
+}
 
 function normalizeName(name: string): string {
   return name
@@ -25,7 +46,7 @@ verifyRouter.post('/', async (req: Request, res: Response) => {
   }
 
   const { companyName, jurisdiction } = parsed.data;
-  const user = (req as any).user as JwtClaims;
+  const user = req.user as JwtClaims;
   const jobId = randomUUID();
   const now = new Date().toISOString();
   const normalizedName = normalizeName(companyName);
@@ -73,9 +94,12 @@ verifyRouter.get('/:id/status', async (req: Request, res: Response) => {
     };
 
     if (job.status === 'completed') {
-      const result = await getVerificationResult(req.params.id as string);
-      if (result) {
-        response.result = result;
+      const results = await getVerificationResults(req.params.id as string);
+      if (results.length > 0) {
+        const user = req.user as JwtClaims;
+        response.results = user.scope === 'external'
+          ? results.map(redactRecord)
+          : results;
       }
     }
 

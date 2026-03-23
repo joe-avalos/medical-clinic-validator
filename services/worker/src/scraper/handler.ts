@@ -1,13 +1,16 @@
 import { VerificationJobMessageSchema } from '@medical-validator/shared';
-import type { ScraperResultMessage } from '@medical-validator/shared';
-import { updateJobStatus } from '../shared/dynamodb.js';
-import { getCachedScraperResult, setCachedScraperResult } from '../shared/redis.js';
-import { scrapeOpenCorporates } from './opencorporates.js';
+import type { ScraperResultMessage, Scope, VerificationRecord } from '@medical-validator/shared';
+import { updateJobStatus, getRecordsByJobId, putVerificationRecords } from '../shared/dynamodb.js';
+import { getCachedJobId } from '../shared/redis.js';
+import { TTL_DAYS } from '../shared/constants.js';
+import { createScraperProvider } from './scraper-provider.js';
 import { sendMessage } from '../shared/sqs.js';
 
 const VALIDATION_QUEUE_URL =
   process.env.SQS_VALIDATION_QUEUE_URL ||
   'http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/validation-queue.fifo';
+
+const provider = createScraperProvider();
 
 export async function handleScraperMessage(body: unknown): Promise<void> {
   const message = VerificationJobMessageSchema.parse(body);
@@ -16,48 +19,78 @@ export async function handleScraperMessage(body: unknown): Promise<void> {
   // 1. Update job status → processing
   await updateJobStatus(message.jobId, 'processing');
 
-  // 2. Check Redis cache
-  let companies;
-  let cachedResult = false;
-
+  // 2. Check Redis for cached jobId
   try {
-    const cached = await getCachedScraperResult(message.normalizedName);
+    const cached = await getCachedJobId(message.normalizedName);
     if (cached) {
-      companies = cached;
-      cachedResult = true;
-      console.log(`[scraper] Cache hit for "${message.normalizedName}"`);
+      console.log(`[scraper] Cache hit for "${message.normalizedName}" → job ${cached.jobId}`);
+      await copyCachedResults(message.jobId, cached.jobId, cached.createdAt, message.scope);
+      return;
     }
   } catch (err) {
     console.warn('[scraper] Redis read failed, proceeding without cache:', (err as Error).message);
   }
 
-  // 3. Scrape OpenCorporates if cache miss
-  if (!companies) {
-    try {
-      companies = await scrapeOpenCorporates(message.normalizedName, message.jurisdiction);
-    } catch (err) {
-      await updateJobStatus(message.jobId, 'failed', (err as Error).message);
-      throw err;
-    }
-
-    // 4. Write to Redis cache
-    try {
-      await setCachedScraperResult(message.normalizedName, companies);
-    } catch (err) {
-      console.warn('[scraper] Redis write failed:', (err as Error).message);
-    }
+  // 3. Scrape (cache miss)
+  let companies;
+  try {
+    companies = await provider.search(message.normalizedName, message.jurisdiction);
+  } catch (err) {
+    await updateJobStatus(message.jobId, 'failed', (err as Error).message);
+    throw err;
   }
 
-  // 5. Publish ScraperResultMessage to validation queue
+  // 4. Publish ScraperResultMessage to validation queue
   const result: ScraperResultMessage = {
     jobId: message.jobId,
     normalizedName: message.normalizedName,
     scope: message.scope,
-    cachedResult,
+    cachedResult: false,
     companies,
     scrapedAt: new Date().toISOString(),
   };
 
   await sendMessage(VALIDATION_QUEUE_URL, result, message.jobId);
-  console.log(`[scraper] Published result for job ${message.jobId} (${companies.length} companies, cached: ${cachedResult})`);
+  console.log(`[scraper] Published result for job ${message.jobId} (${companies.length} companies)`);
+}
+
+async function copyCachedResults(
+  newJobId: string,
+  originalJobId: string,
+  originalCreatedAt: string,
+  scope: Scope,
+): Promise<void> {
+  const originalRecords = await getRecordsByJobId(originalJobId);
+
+  if (originalRecords.length === 0) {
+    console.warn(`[scraper] Cached job ${originalJobId} has no records, falling through to scrape`);
+    // Can't short-circuit — let the job fail gracefully
+    await updateJobStatus(newJobId, 'failed', 'Cached job had no records');
+    return;
+  }
+
+  const now = new Date();
+  const ttl = Math.floor(now.getTime() / 1000) + TTL_DAYS * 24 * 60 * 60;
+
+  const copies: VerificationRecord[] = originalRecords.map((r) => ({
+    ...r,
+    pk: `JOB#${newJobId}`,
+    jobId: newJobId,
+    cachedResult: true,
+    cachedFromJobId: originalJobId,
+    originalValidatedAt: r.validatedAt,
+    scope,
+    createdAt: now.toISOString(),
+    ttl,
+  }));
+
+  await putVerificationRecords(copies);
+  await updateJobStatus(newJobId, 'completed');
+  console.log(`[scraper] Copied ${copies.length} cached records from job ${originalJobId} → ${newJobId}`);
+}
+
+export async function shutdownScraper(): Promise<void> {
+  if (provider.cleanup) {
+    await provider.cleanup();
+  }
 }

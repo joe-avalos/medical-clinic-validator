@@ -3,7 +3,7 @@ import { AnthropicProvider } from './anthropic-provider.js';
 import { OllamaProvider } from './ollama-provider.js';
 
 export interface AIProvider {
-  validate(companies: RawCompanyRecord[]): Promise<ValidationResult>;
+  validateAll(companies: RawCompanyRecord[]): Promise<ValidationResult[]>;
 }
 
 type ProviderType = 'anthropic' | 'ollama';

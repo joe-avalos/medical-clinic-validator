@@ -12,11 +12,11 @@ vi.mock('../../clients/sqs.js', () => ({
 
 const mockCreateJob = vi.fn();
 const mockGetJobStatus = vi.fn();
-const mockGetVerificationResult = vi.fn();
+const mockGetVerificationResults = vi.fn();
 vi.mock('../../clients/dynamodb.js', () => ({
   createJob: mockCreateJob,
   getJobStatus: mockGetJobStatus,
-  getVerificationResult: mockGetVerificationResult,
+  getVerificationResults: mockGetVerificationResults,
 }));
 
 describe('POST /verify', () => {
@@ -281,7 +281,7 @@ describe('GET /verify/:id/status', () => {
     expect(res.body.status).toBe('queued');
   });
 
-  it('returns completed status with result', async () => {
+  it('returns completed status with results array', async () => {
     mockGetJobStatus.mockResolvedValue({
       jobId: 'job-001',
       status: 'completed',
@@ -290,11 +290,11 @@ describe('GET /verify/:id/status', () => {
       updatedAt: '2026-03-22T10:00:05Z',
     });
 
-    mockGetVerificationResult.mockResolvedValue({
+    mockGetVerificationResults.mockResolvedValue([{
       companyName: 'MAYO HEALTH SYSTEM',
       riskLevel: 'LOW',
       aiSummary: 'Entity is actively registered.',
-    });
+    }]);
 
     const token = createToken();
     const res = await request(app)
@@ -303,8 +303,9 @@ describe('GET /verify/:id/status', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('completed');
-    expect(res.body.result).toBeDefined();
-    expect(res.body.result.riskLevel).toBe('LOW');
+    expect(res.body.results).toBeDefined();
+    expect(res.body.results).toHaveLength(1);
+    expect(res.body.results[0].riskLevel).toBe('LOW');
   });
 
   it('returns failed status with errorMessage', async () => {

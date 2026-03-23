@@ -52,7 +52,7 @@ describe('createAIProvider', () => {
     const { createAIProvider } = await import('../ai-provider.js');
     const provider = createAIProvider();
     expect(provider).toBeDefined();
-    expect(provider.validate).toBeTypeOf('function');
+    expect(provider.validateAll).toBeTypeOf('function');
   });
 
   it('creates anthropic provider when AI_PROVIDER=anthropic', async () => {
@@ -82,18 +82,19 @@ describe('AnthropicProvider', () => {
     mockCreate.mockReset();
   });
 
-  it('returns valid ValidationResult on successful API call', async () => {
+  it('returns array of ValidationResults on successful API call', async () => {
     mockCreate.mockResolvedValue({
       content: [{ type: 'text', text: JSON.stringify(VALID_AI_RESPONSE) }],
     });
 
     const { AnthropicProvider } = await import('../anthropic-provider.js');
     const provider = new AnthropicProvider();
-    const result = await provider.validate(SAMPLE_COMPANIES);
+    const results = await provider.validateAll(SAMPLE_COMPANIES);
 
-    expect(result.companyName).toBe('MAYO HEALTH SYSTEM');
-    expect(result.riskLevel).toBe('LOW');
-    expect(result.confidence).toBe('HIGH');
+    expect(results).toHaveLength(1);
+    expect(results[0].companyName).toBe('MAYO HEALTH SYSTEM');
+    expect(results[0].riskLevel).toBe('LOW');
+    expect(results[0].confidence).toBe('HIGH');
   });
 
   it('passes system and user prompts to Claude', async () => {
@@ -103,7 +104,7 @@ describe('AnthropicProvider', () => {
 
     const { AnthropicProvider } = await import('../anthropic-provider.js');
     const provider = new AnthropicProvider();
-    await provider.validate(SAMPLE_COMPANIES);
+    await provider.validateAll(SAMPLE_COMPANIES);
 
     expect(mockCreate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -118,18 +119,18 @@ describe('AnthropicProvider', () => {
     );
   });
 
-  it('validates response with Zod and rejects invalid shape', async () => {
+  it('validates response with Zod and returns fallback for invalid shape', async () => {
     mockCreate.mockResolvedValue({
       content: [{ type: 'text', text: JSON.stringify({ invalid: true }) }],
     });
 
     const { AnthropicProvider } = await import('../anthropic-provider.js');
     const provider = new AnthropicProvider();
+    const results = await provider.validateAll(SAMPLE_COMPANIES);
 
-    // Should fall back to UNKNOWN, not throw
-    const result = await provider.validate(SAMPLE_COMPANIES);
-    expect(result.riskLevel).toBe('UNKNOWN');
-    expect(result.confidence).toBe('LOW');
+    expect(results).toHaveLength(1);
+    expect(results[0].riskLevel).toBe('UNKNOWN');
+    expect(results[0].confidence).toBe('LOW');
   });
 
   it('returns fallback on malformed JSON response', async () => {
@@ -139,11 +140,12 @@ describe('AnthropicProvider', () => {
 
     const { AnthropicProvider } = await import('../anthropic-provider.js');
     const provider = new AnthropicProvider();
-    const result = await provider.validate(SAMPLE_COMPANIES);
+    const results = await provider.validateAll(SAMPLE_COMPANIES);
 
-    expect(result.riskLevel).toBe('UNKNOWN');
-    expect(result.aiSummary).toContain('unavailable');
-    expect(result.confidence).toBe('LOW');
+    expect(results).toHaveLength(1);
+    expect(results[0].riskLevel).toBe('UNKNOWN');
+    expect(results[0].aiSummary).toContain('unavailable');
+    expect(results[0].confidence).toBe('LOW');
   });
 
   it('returns fallback when API throws', async () => {
@@ -151,9 +153,10 @@ describe('AnthropicProvider', () => {
 
     const { AnthropicProvider } = await import('../anthropic-provider.js');
     const provider = new AnthropicProvider();
-    const result = await provider.validate(SAMPLE_COMPANIES);
+    const results = await provider.validateAll(SAMPLE_COMPANIES);
 
-    expect(result.riskLevel).toBe('UNKNOWN');
-    expect(result.confidence).toBe('LOW');
+    expect(results).toHaveLength(1);
+    expect(results[0].riskLevel).toBe('UNKNOWN');
+    expect(results[0].confidence).toBe('LOW');
   });
 });

@@ -1,22 +1,24 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { RawCompanyRecord, VerificationJobMessage } from '@medical-validator/shared';
+import type { RawCompanyRecord, VerificationJobMessage, VerificationRecord } from '@medical-validator/shared';
 
 // Mock dependencies before importing handler
-const mockGetCached = vi.fn();
-const mockSetCached = vi.fn();
+const mockGetCachedJobId = vi.fn();
 vi.mock('../../shared/redis.js', () => ({
-  getCachedScraperResult: mockGetCached,
-  setCachedScraperResult: mockSetCached,
+  getCachedJobId: mockGetCachedJobId,
 }));
 
 const mockUpdateJobStatus = vi.fn();
+const mockGetRecordsByJobId = vi.fn();
+const mockPutVerificationRecords = vi.fn();
 vi.mock('../../shared/dynamodb.js', () => ({
   updateJobStatus: mockUpdateJobStatus,
+  getRecordsByJobId: mockGetRecordsByJobId,
+  putVerificationRecords: mockPutVerificationRecords,
 }));
 
-const mockScrapeOpenCorporates = vi.fn();
-vi.mock('../opencorporates.js', () => ({
-  scrapeOpenCorporates: mockScrapeOpenCorporates,
+const mockSearch = vi.fn();
+vi.mock('../scraper-provider.js', () => ({
+  createScraperProvider: () => ({ search: mockSearch }),
 }));
 
 const mockSendMessage = vi.fn();
@@ -46,12 +48,41 @@ const FAKE_COMPANIES: RawCompanyRecord[] = [
   },
 ];
 
+const FAKE_CACHED_RECORDS: VerificationRecord[] = [
+  {
+    pk: 'JOB#job-original',
+    sk: 'RESULT#0f23674b',
+    jobId: 'job-original',
+    companyNumber: '0f23674b',
+    companyName: 'MAYO HEALTH SYSTEM',
+    normalizedName: 'mayo health system',
+    jurisdiction: 'us_mn',
+    registrationNumber: '0f23674b',
+    incorporationDate: '1905-12-13',
+    legalStatus: 'Active',
+    standardizedAddress: '211 S Newton, Albert Lea, MN 56007',
+    providerType: 'Health System',
+    riskLevel: 'LOW',
+    riskFlags: [],
+    aiSummary: 'Entity is actively registered in Minnesota.',
+    confidence: 'HIGH',
+    cachedResult: false,
+    cachedFromJobId: null,
+    originalValidatedAt: null,
+    rawSourceData: { classes: ['active'] },
+    jobStatus: 'completed',
+    createdAt: '2026-03-22T08:00:00Z',
+    validatedAt: '2026-03-22T08:00:00Z',
+    ttl: 9999999999,
+    scope: 'internal',
+  },
+];
+
 describe('handleScraperMessage', () => {
   let handleScraperMessage: (body: unknown) => Promise<void>;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    // Dynamic import to pick up mocks
     const mod = await import('../handler.js');
     handleScraperMessage = mod.handleScraperMessage;
   });
@@ -61,8 +92,8 @@ describe('handleScraperMessage', () => {
   });
 
   it('updates job status to processing on start', async () => {
-    mockGetCached.mockResolvedValue(null);
-    mockScrapeOpenCorporates.mockResolvedValue(FAKE_COMPANIES);
+    mockGetCachedJobId.mockResolvedValue(null);
+    mockSearch.mockResolvedValue(FAKE_COMPANIES);
 
     await handleScraperMessage(VALID_MESSAGE);
 
@@ -72,61 +103,60 @@ describe('handleScraperMessage', () => {
     );
   });
 
-  describe('cache hit', () => {
+  describe('cache hit (query→jobId)', () => {
     beforeEach(() => {
-      mockGetCached.mockResolvedValue(FAKE_COMPANIES);
+      mockGetCachedJobId.mockResolvedValue({ jobId: 'job-original', createdAt: '2026-03-22T08:00:00Z' });
+      mockGetRecordsByJobId.mockResolvedValue(FAKE_CACHED_RECORDS);
     });
 
     it('skips scraping when cache hit', async () => {
       await handleScraperMessage(VALID_MESSAGE);
-      expect(mockScrapeOpenCorporates).not.toHaveBeenCalled();
+      expect(mockSearch).not.toHaveBeenCalled();
     });
 
-    it('publishes result with cachedResult: true', async () => {
+    it('does not send message to validation queue', async () => {
+      await handleScraperMessage(VALID_MESSAGE);
+      expect(mockSendMessage).not.toHaveBeenCalled();
+    });
+
+    it('copies records from original job with cachedResult: true', async () => {
       await handleScraperMessage(VALID_MESSAGE);
 
-      expect(mockSendMessage).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          jobId: 'job-001',
-          cachedResult: true,
-          companies: FAKE_COMPANIES,
-        }),
-        expect.any(String),
+      expect(mockPutVerificationRecords).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            pk: 'JOB#job-001',
+            jobId: 'job-001',
+            cachedResult: true,
+            cachedFromJobId: 'job-original',
+            originalValidatedAt: '2026-03-22T08:00:00Z',
+          }),
+        ]),
       );
     });
 
-    it('does not write back to cache on hit', async () => {
+    it('updates job status to completed', async () => {
       await handleScraperMessage(VALID_MESSAGE);
-      expect(mockSetCached).not.toHaveBeenCalled();
+      expect(mockUpdateJobStatus).toHaveBeenCalledWith('job-001', 'completed');
     });
   });
 
   describe('cache miss', () => {
     beforeEach(() => {
-      mockGetCached.mockResolvedValue(null);
-      mockScrapeOpenCorporates.mockResolvedValue(FAKE_COMPANIES);
+      mockGetCachedJobId.mockResolvedValue(null);
+      mockSearch.mockResolvedValue(FAKE_COMPANIES);
     });
 
-    it('calls scrapeOpenCorporates with name and jurisdiction', async () => {
+    it('calls provider.search with name and jurisdiction', async () => {
       await handleScraperMessage(VALID_MESSAGE);
 
-      expect(mockScrapeOpenCorporates).toHaveBeenCalledWith(
+      expect(mockSearch).toHaveBeenCalledWith(
         'mayo health system',
         'us_mn',
       );
     });
 
-    it('writes scrape result to cache', async () => {
-      await handleScraperMessage(VALID_MESSAGE);
-
-      expect(mockSetCached).toHaveBeenCalledWith(
-        'mayo health system',
-        FAKE_COMPANIES,
-      );
-    });
-
-    it('publishes result with cachedResult: false', async () => {
+    it('publishes ScraperResultMessage to validation queue', async () => {
       await handleScraperMessage(VALID_MESSAGE);
 
       expect(mockSendMessage).toHaveBeenCalledWith(
@@ -153,9 +183,9 @@ describe('handleScraperMessage', () => {
   });
 
   describe('empty results', () => {
-    it('publishes empty companies array when scraper returns none', async () => {
-      mockGetCached.mockResolvedValue(null);
-      mockScrapeOpenCorporates.mockResolvedValue([]);
+    it('publishes empty companies array when provider returns none', async () => {
+      mockGetCachedJobId.mockResolvedValue(null);
+      mockSearch.mockResolvedValue([]);
 
       await handleScraperMessage(VALID_MESSAGE);
 
@@ -172,30 +202,20 @@ describe('handleScraperMessage', () => {
 
   describe('redis unavailable', () => {
     it('degrades gracefully when cache read fails', async () => {
-      mockGetCached.mockRejectedValue(new Error('Redis connection refused'));
-      mockScrapeOpenCorporates.mockResolvedValue(FAKE_COMPANIES);
+      mockGetCachedJobId.mockRejectedValue(new Error('Redis connection refused'));
+      mockSearch.mockResolvedValue(FAKE_COMPANIES);
 
       await handleScraperMessage(VALID_MESSAGE);
 
-      expect(mockScrapeOpenCorporates).toHaveBeenCalled();
-      expect(mockSendMessage).toHaveBeenCalled();
-    });
-
-    it('degrades gracefully when cache write fails', async () => {
-      mockGetCached.mockResolvedValue(null);
-      mockScrapeOpenCorporates.mockResolvedValue(FAKE_COMPANIES);
-      mockSetCached.mockRejectedValue(new Error('Redis connection refused'));
-
-      await handleScraperMessage(VALID_MESSAGE);
-
+      expect(mockSearch).toHaveBeenCalled();
       expect(mockSendMessage).toHaveBeenCalled();
     });
   });
 
   describe('scrape failure', () => {
     it('updates job status to failed on unrecoverable error', async () => {
-      mockGetCached.mockResolvedValue(null);
-      mockScrapeOpenCorporates.mockRejectedValue(new Error('CAPTCHA persists'));
+      mockGetCachedJobId.mockResolvedValue(null);
+      mockSearch.mockRejectedValue(new Error('CAPTCHA persists'));
 
       await expect(handleScraperMessage(VALID_MESSAGE)).rejects.toThrow();
 
@@ -208,14 +228,14 @@ describe('handleScraperMessage', () => {
   });
 
   describe('message without jurisdiction', () => {
-    it('passes undefined jurisdiction to scraper', async () => {
+    it('passes undefined jurisdiction to provider', async () => {
       const noJurisdiction = { ...VALID_MESSAGE, jurisdiction: undefined };
-      mockGetCached.mockResolvedValue(null);
-      mockScrapeOpenCorporates.mockResolvedValue(FAKE_COMPANIES);
+      mockGetCachedJobId.mockResolvedValue(null);
+      mockSearch.mockResolvedValue(FAKE_COMPANIES);
 
       await handleScraperMessage(noJurisdiction);
 
-      expect(mockScrapeOpenCorporates).toHaveBeenCalledWith(
+      expect(mockSearch).toHaveBeenCalledWith(
         'mayo health system',
         undefined,
       );

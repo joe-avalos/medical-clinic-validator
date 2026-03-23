@@ -25,8 +25,9 @@ async function main(): Promise<void> {
     case 'scraper': {
       const queueUrl = process.env.SQS_VERIFICATION_QUEUE_URL;
       if (!queueUrl) throw new Error('SQS_VERIFICATION_QUEUE_URL is required');
-      const { handleScraperMessage } = await import('./scraper/handler.js');
+      const { handleScraperMessage, shutdownScraper } = await import('./scraper/handler.js');
       await pollQueue(queueUrl, handleScraperMessage, ac.signal);
+      await shutdownScraper();
       break;
     }
     case 'ai-validator': {

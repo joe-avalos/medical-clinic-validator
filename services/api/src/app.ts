@@ -15,7 +15,7 @@ app.use(express.json());
 app.use(
   rateLimit({
     windowMs: 60 * 1000,
-    max: 100,
+    max: Number(process.env.RATE_LIMIT_PER_MINUTE) || 200,
     standardHeaders: true,
     legacyHeaders: false,
   }),

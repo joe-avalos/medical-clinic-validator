@@ -8,7 +8,7 @@ const mockQueryRecords = vi.fn();
 vi.mock('../../clients/dynamodb.js', () => ({
   createJob: vi.fn(),
   getJobStatus: vi.fn(),
-  getVerificationResult: vi.fn(),
+  getVerificationResults: vi.fn(),
   queryRecords: mockQueryRecords,
 }));
 
@@ -17,9 +17,10 @@ vi.mock('../../clients/sqs.js', () => ({
 }));
 
 const FULL_RECORD = {
-  pk: 'COMPANY#mayo health system',
-  sk: 'JOB#job-001',
+  pk: 'JOB#job-001',
+  sk: 'RESULT#0f23674b',
   jobId: 'job-001',
+  companyNumber: '0f23674b',
   companyName: 'MAYO HEALTH SYSTEM',
   normalizedName: 'mayo health system',
   jurisdiction: 'us_mn',
@@ -33,8 +34,10 @@ const FULL_RECORD = {
   aiSummary: 'Entity is actively registered in Minnesota.',
   confidence: 'HIGH',
   cachedResult: false,
+  cachedFromJobId: null,
+  originalValidatedAt: null,
   scope: 'internal',
-  rawSourceData: [],
+  rawSourceData: { classes: ['active'] },
   jobStatus: 'completed' as const,
   createdAt: '2026-03-22T10:00:00Z',
   validatedAt: '2026-03-22T10:00:05Z',

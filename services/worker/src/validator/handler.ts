@@ -27,12 +27,12 @@ export async function handleValidatorMessage(body: unknown): Promise<void> {
   const message = ScraperResultMessageSchema.parse(body);
   console.log(`[ai-validator] Received job ${message.jobId} with ${message.companies.length} companies`);
 
-  let validation: ValidationResult;
+  let validations: ValidationResult[];
 
   if (message.companies.length === 0) {
-    validation = buildEmptyResult();
+    validations = [buildEmptyResult()];
   } else {
-    validation = await provider.validate(message.companies);
+    validations = await provider.validateAll(message.companies);
   }
 
   const outbound: ValidationResultMessage = {
@@ -40,11 +40,11 @@ export async function handleValidatorMessage(body: unknown): Promise<void> {
     normalizedName: message.normalizedName,
     scope: message.scope,
     cachedResult: message.cachedResult,
-    validation,
+    validations,
     rawSourceData: message.companies,
     validatedAt: new Date().toISOString(),
   };
 
   await sendMessage(STORAGE_QUEUE_URL, outbound, message.jobId);
-  console.log(`[ai-validator] Published validation result for job ${message.jobId} (risk: ${validation.riskLevel})`);
+  console.log(`[ai-validator] Published ${validations.length} validation results for job ${message.jobId}`);
 }

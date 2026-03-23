@@ -37,7 +37,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
       return;
     }
 
-    (req as any).user = decoded as unknown as JwtClaims;
+    req.user = decoded as JwtClaims;
     next();
   } catch {
     res.status(401).json({ error: 'Invalid or expired token' });

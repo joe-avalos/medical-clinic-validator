@@ -11,7 +11,7 @@ You MUST respond with valid JSON only — no markdown, no explanation, no wrappi
   "registrationNumber": "string — company registration number",
   "incorporationDate": "string|null — ISO 8601 date or null if unknown",
   "legalStatus": "Active|Inactive|Dissolved|Unknown",
-  "standardizedAddress": "string — cleaned registered address",
+  "standardizedAddress": "string — Proper Case, full address with validated 5-digit or ZIP+4 code (e.g. '200 First St SW, Rochester, MN 55905')",
   "providerType": "Clinic|Health System|Hospital|Urgent Care|Non-profit|Pharmacy|Laboratory|Unknown",
   "riskLevel": "LOW|MEDIUM|HIGH|UNKNOWN",
   "riskFlags": ["array of string flags describing any concerns"],
@@ -27,18 +27,10 @@ Risk level rules:
 }
 
 export function buildUserPrompt(companies: RawCompanyRecord[]): string {
-  return `Analyze the following company registration data and produce a validation result.
+  return `Analyze the following company registration record and produce a validation result.
 
 Company data:
-${JSON.stringify(companies, null, 2)}
+${JSON.stringify(companies[0], null, 2)}
 
-Risk level rules:
-- LOW: Active registration, matches jurisdiction, no anomalies
-- MEDIUM: Active but incomplete data, multiple registrations, minor discrepancies
-- HIGH: Dissolved, suspended, inactive, or jurisdiction mismatch
-- UNKNOWN: Not found or data is inconclusive
-
-Required response fields: companyName, jurisdiction, registrationNumber, incorporationDate, legalStatus, standardizedAddress, providerType, riskLevel, riskFlags, aiSummary, confidence.
-
-Respond with JSON only.`;
+Respond with a single JSON object only.`;
 }

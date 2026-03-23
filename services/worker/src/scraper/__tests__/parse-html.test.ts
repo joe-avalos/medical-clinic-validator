@@ -94,9 +94,8 @@ describe('parseSearchResults', () => {
     });
   });
 
-  describe('result limit', () => {
-    it('returns at most 5 results', () => {
-      // Build HTML with 8 results
+  describe('many results', () => {
+    it('returns all results without capping', () => {
       const items = Array.from({ length: 8 }, (_, i) =>
         `<li class="search-result company active">
           <a class="company_search_result" href="/companies/us_mn/company-${i}">Company ${i}</a>
@@ -106,7 +105,7 @@ describe('parseSearchResults', () => {
       const html = `<ul id="companies">${items}</ul>`;
 
       const results = parseSearchResults(html);
-      expect(results).toHaveLength(5);
+      expect(results).toHaveLength(8);
     });
   });
 });

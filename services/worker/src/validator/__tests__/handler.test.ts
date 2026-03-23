@@ -6,9 +6,9 @@ import type {
 } from '@medical-validator/shared';
 
 // Mock dependencies
-const mockValidate = vi.fn();
+const mockValidateAll = vi.fn();
 vi.mock('../ai-provider.js', () => ({
-  createAIProvider: () => ({ validate: mockValidate }),
+  createAIProvider: () => ({ validateAll: mockValidateAll }),
 }));
 
 const mockSendMessage = vi.fn();
@@ -66,14 +66,14 @@ describe('handleValidatorMessage', () => {
   });
 
   it('calls AI provider with companies', async () => {
-    mockValidate.mockResolvedValue(VALID_RESULT);
+    mockValidateAll.mockResolvedValue([VALID_RESULT]);
     await handleValidatorMessage(VALID_MESSAGE);
 
-    expect(mockValidate).toHaveBeenCalledWith(FAKE_COMPANIES);
+    expect(mockValidateAll).toHaveBeenCalledWith(FAKE_COMPANIES);
   });
 
-  it('publishes ValidationResultMessage to storage queue', async () => {
-    mockValidate.mockResolvedValue(VALID_RESULT);
+  it('publishes ValidationResultMessage with validations array', async () => {
+    mockValidateAll.mockResolvedValue([VALID_RESULT]);
     await handleValidatorMessage(VALID_MESSAGE);
 
     expect(mockSendMessage).toHaveBeenCalledWith(
@@ -83,7 +83,7 @@ describe('handleValidatorMessage', () => {
         normalizedName: 'mayo health system',
         scope: 'internal',
         cachedResult: false,
-        validation: VALID_RESULT,
+        validations: [VALID_RESULT],
         rawSourceData: FAKE_COMPANIES,
         validatedAt: expect.any(String),
       }),
@@ -99,7 +99,7 @@ describe('handleValidatorMessage', () => {
 
     it('skips AI call when companies array is empty', async () => {
       await handleValidatorMessage(emptyMessage);
-      expect(mockValidate).not.toHaveBeenCalled();
+      expect(mockValidateAll).not.toHaveBeenCalled();
     });
 
     it('publishes UNKNOWN risk result for empty companies', async () => {
@@ -108,11 +108,13 @@ describe('handleValidatorMessage', () => {
       expect(mockSendMessage).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
-          validation: expect.objectContaining({
-            riskLevel: 'UNKNOWN',
-            confidence: 'LOW',
-            aiSummary: expect.stringContaining('No'),
-          }),
+          validations: [
+            expect.objectContaining({
+              riskLevel: 'UNKNOWN',
+              confidence: 'LOW',
+              aiSummary: expect.stringContaining('No'),
+            }),
+          ],
         }),
         expect.any(String),
       );
@@ -120,7 +122,7 @@ describe('handleValidatorMessage', () => {
   });
 
   it('passes through rawSourceData unchanged', async () => {
-    mockValidate.mockResolvedValue(VALID_RESULT);
+    mockValidateAll.mockResolvedValue([VALID_RESULT]);
     await handleValidatorMessage(VALID_MESSAGE);
 
     const published = mockSendMessage.mock.calls[0][1];
@@ -129,7 +131,7 @@ describe('handleValidatorMessage', () => {
 
   it('preserves scope from inbound message', async () => {
     const externalMsg = { ...VALID_MESSAGE, scope: 'external' as const };
-    mockValidate.mockResolvedValue(VALID_RESULT);
+    mockValidateAll.mockResolvedValue([VALID_RESULT]);
     await handleValidatorMessage(externalMsg);
 
     const published = mockSendMessage.mock.calls[0][1];
@@ -138,7 +140,7 @@ describe('handleValidatorMessage', () => {
 
   it('preserves cachedResult flag', async () => {
     const cachedMsg = { ...VALID_MESSAGE, cachedResult: true };
-    mockValidate.mockResolvedValue(VALID_RESULT);
+    mockValidateAll.mockResolvedValue([VALID_RESULT]);
     await handleValidatorMessage(cachedMsg);
 
     const published = mockSendMessage.mock.calls[0][1];

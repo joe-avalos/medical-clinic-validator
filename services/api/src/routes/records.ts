@@ -1,0 +1,1 @@
+// GET /records — TDD stub

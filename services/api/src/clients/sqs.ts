@@ -1,0 +1,1 @@
+// SQS producer client — TDD stub

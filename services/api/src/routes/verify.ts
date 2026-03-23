@@ -1,0 +1,1 @@
+// POST /verify, GET /verify/:id/status — TDD stub

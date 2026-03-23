@@ -1,4 +1,4 @@
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 
 const CACHE_TTL = 86400; // 24 hours
 const QUERY_KEY_PREFIX = 'query:job:';

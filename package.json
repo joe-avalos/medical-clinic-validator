@@ -3,11 +3,26 @@
   "version": "1.0.0",
   "description": "",
   "main": "dist/index.js",
+  "type": "module",
   "scripts": {
+    "dev": "npm run infra:up && npm run dev:services",
+    "dev:services": "concurrently -k -n api,scraper,validator,storage,frontend -c blue,yellow,magenta,cyan,green \"npm run dev:api\" \"npm run dev:scraper\" \"npm run dev:validator\" \"npm run dev:storage\" \"npm run dev:frontend\"",
+    "dev:api": "cd services/api && npm run dev:local",
+    "dev:scraper": "cd services/worker && WORKER_TYPE=scraper npm run dev:local",
+    "dev:validator": "cd services/worker && WORKER_TYPE=ai-validator npm run dev:local",
+    "dev:storage": "cd services/worker && WORKER_TYPE=storage npm run dev:local",
+    "dev:frontend": "cd services/frontend && npm run dev",
+    "infra:up": "docker compose up -d --wait",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f",
+    "cookie:refresh": "tsx scripts/refresh-cookies.ts",
     "build": "tsc"
   },
-  "dependencies": {},
   "devDependencies": {
+    "concurrently": "^9.2.1",
+    "dotenv": "^17.3.1",
+    "puppeteer": "^24.40.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.5.3"
   },
   "private": true

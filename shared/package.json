@@ -1,0 +1,12 @@
+{
+  "name": "@medical-validator/shared",
+  "version": "1.0.0",
+  "private": true,
+  "main": "types/index.ts",
+  "dependencies": {
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

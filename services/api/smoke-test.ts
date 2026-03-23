@@ -27,14 +27,17 @@ const seedJobRecord = {
   updatedAt: '2026-03-23T10:00:30Z',
 };
 
+const SEED_COMPANY_NUMBER = '12345678';
+
 const seedVerificationRecord = {
-  pk: `COMPANY#${SEED_NORMALIZED}`,
-  sk: `JOB#${SEED_JOB_ID}`,
+  pk: `JOB#${SEED_JOB_ID}`,
+  sk: `RESULT#${SEED_COMPANY_NUMBER}`,
   jobId: SEED_JOB_ID,
+  companyNumber: SEED_COMPANY_NUMBER,
   companyName: 'Mayo Health System',
   normalizedName: SEED_NORMALIZED,
   jurisdiction: 'us_mn',
-  registrationNumber: '12345678',
+  registrationNumber: SEED_COMPANY_NUMBER,
   incorporationDate: '1919-01-01',
   legalStatus: 'Active',
   standardizedAddress: '200 First St SW, Rochester, MN 55905',
@@ -44,7 +47,9 @@ const seedVerificationRecord = {
   aiSummary: 'Entity is actively registered in Minnesota with no anomalies detected.',
   confidence: 'HIGH',
   cachedResult: false,
-  rawSourceData: [{ name: 'Mayo Health System', jurisdiction: 'us_mn', status: 'Active' }],
+  cachedFromJobId: null,
+  originalValidatedAt: null,
+  rawSourceData: { name: 'Mayo Health System', jurisdiction: 'us_mn', status: 'Active' },
   jobStatus: 'completed',
   scope: 'internal',
   createdAt: '2026-03-23T10:00:00Z',
@@ -174,10 +179,30 @@ async function main() {
     assert(pollNew.data.status === 'queued', `status is queued`);
 
     // --- 5. Poll seeded job (completed) ---
-    console.log(`\n=== 6. GET /verify/${SEED_JOB_ID}/status (completed) ===`);
+    console.log(`\n=== 6. GET /verify/${SEED_JOB_ID}/status (completed, internal) ===`);
     const pollSeed = await request('GET', `/verify/${SEED_JOB_ID}/status`, { token: internalToken });
     assert(pollSeed.status === 200, `Expected 200, got ${pollSeed.status}`);
     assert(pollSeed.data.status === 'completed', `status is completed: ${pollSeed.data.status}`);
+    const pollResults = pollSeed.data.results as Record<string, unknown>[];
+    assert(Array.isArray(pollResults), `results is array`);
+    assert(pollResults.length >= 1, `has at least 1 result: ${pollResults.length}`);
+    if (pollResults.length > 0) {
+      assert(pollResults[0].registrationNumber === SEED_COMPANY_NUMBER, `registrationNumber present (internal)`);
+      assert(pollResults[0].rawSourceData !== undefined, `rawSourceData present (internal)`);
+    }
+
+    // --- 5b. Poll seeded job (completed, external — redacted) ---
+    console.log(`\n=== 6b. GET /verify/${SEED_JOB_ID}/status (completed, external) ===`);
+    const pollSeedExt = await request('GET', `/verify/${SEED_JOB_ID}/status`, { token: externalToken });
+    assert(pollSeedExt.status === 200, `Expected 200, got ${pollSeedExt.status}`);
+    const pollExtResults = pollSeedExt.data.results as Record<string, unknown>[];
+    assert(Array.isArray(pollExtResults), `results is array`);
+    if (pollExtResults.length > 0) {
+      assert(!('registrationNumber' in pollExtResults[0]), 'registrationNumber redacted in status');
+      assert(!('rawSourceData' in pollExtResults[0]), 'rawSourceData redacted in status');
+      assert(!('cachedFromJobId' in pollExtResults[0]), 'cachedFromJobId redacted in status');
+      assert(!('originalValidatedAt' in pollExtResults[0]), 'originalValidatedAt redacted in status');
+    }
 
     // --- 6. Poll nonexistent ---
     console.log('\n=== 7. GET /verify/nonexistent/status ===');
@@ -198,9 +223,9 @@ async function main() {
     if (seedRec) {
       assert(seedRec.companyName === 'Mayo Health System', `companyName: ${seedRec.companyName}`);
       assert(seedRec.riskLevel === 'LOW', `riskLevel: ${seedRec.riskLevel}`);
-      assert(seedRec.registrationNumber === '12345678', `registrationNumber present (internal)`);
+      assert(seedRec.registrationNumber === SEED_COMPANY_NUMBER, `registrationNumber present (internal)`);
       assert(seedRec.confidence === 'HIGH', `confidence present (internal)`);
-      assert(Array.isArray(seedRec.rawSourceData), `rawSourceData present (internal)`);
+      assert(typeof seedRec.rawSourceData === 'object' && !Array.isArray(seedRec.rawSourceData), `rawSourceData is record (internal)`);
       console.log(`  Record: ${seedRec.companyName} | ${seedRec.riskLevel} risk | ${seedRec.legalStatus}`);
     }
 
@@ -220,6 +245,8 @@ async function main() {
       assert(!('pk' in extSeedRec), 'pk redacted');
       assert(!('sk' in extSeedRec), 'sk redacted');
       assert(!('rawSourceData' in extSeedRec), 'rawSourceData redacted');
+      assert(!('cachedFromJobId' in extSeedRec), 'cachedFromJobId redacted');
+      assert(!('originalValidatedAt' in extSeedRec), 'originalValidatedAt redacted');
       assert('companyName' in extSeedRec, 'companyName visible');
       assert('riskLevel' in extSeedRec, 'riskLevel visible');
       assert('aiSummary' in extSeedRec, 'aiSummary visible');

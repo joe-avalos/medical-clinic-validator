@@ -152,6 +152,20 @@ describe('POST /verify', () => {
     );
   });
 
+  it('preserves hyphens during normalization', async () => {
+    const token = createToken();
+    await request(app)
+      .post('/verify')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ companyName: "Mayo-Clinic Health System" });
+
+    expect(mockSendToVerificationQueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        normalizedName: 'mayo-clinic health system',
+      }),
+    );
+  });
+
   it('passes scope from JWT claims to SQS message', async () => {
     const token = createToken({ scope: 'external' });
     await request(app)

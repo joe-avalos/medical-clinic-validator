@@ -1,1 +1,23 @@
-// SQS producer client — TDD stub
+import { SQSClient, SendMessageCommand } from '@aws-sdk/client-sqs';
+import type { VerificationJobMessage } from '@medical-validator/shared';
+
+const sqs = new SQSClient({
+  endpoint: process.env.SQS_ENDPOINT || 'http://localhost:4566',
+  region: process.env.AWS_DEFAULT_REGION || 'us-east-1',
+});
+
+const VERIFICATION_QUEUE_URL =
+  process.env.VERIFICATION_QUEUE_URL ||
+  'http://localhost:4566/000000000000/verification-queue.fifo';
+
+export async function sendToVerificationQueue(
+  message: VerificationJobMessage,
+): Promise<void> {
+  await sqs.send(
+    new SendMessageCommand({
+      QueueUrl: VERIFICATION_QUEUE_URL,
+      MessageBody: JSON.stringify(message),
+      MessageGroupId: message.normalizedName,
+    }),
+  );
+}

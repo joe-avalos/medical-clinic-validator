@@ -7,12 +7,16 @@ yarn-debug.log*
 yarn-error.log*
 /.pnp
 .pnp.js
+*/node_modules
 
 .vscode/*
 .idea
 
 # Secrets
 .env
+
+# Council logs
+.claude/councils/
 
 # LocalStack
 localstack_data/

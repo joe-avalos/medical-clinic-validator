@@ -12,7 +12,7 @@ UNTRACKED=$(cd "$CLAUDE_PROJECT_DIR" && git ls-files --others --exclude-standard
 UNTRACKED_CONTENT=""
 if [ -n "$UNTRACKED" ]; then
   while IFS= read -r file; do
-    if [ -f "$CLAUDE_PROJECT_DIR/$file" ]; then
+    if [ -f "$CLAUDE_PROJECT_DIR/$file" ] && [ ! -L "$CLAUDE_PROJECT_DIR/$file" ]; then
       CONTENT=$(head -200 "$CLAUDE_PROJECT_DIR/$file" 2>/dev/null || true)
       if [ -n "$CONTENT" ]; then
         UNTRACKED_CONTENT="${UNTRACKED_CONTENT}
@@ -88,6 +88,13 @@ REVIEW=$(echo "$RESPONSE" | jq -r '.content[0].text // "NO_ISSUES"' 2>/dev/null 
 if [ "$REVIEW" = "NO_ISSUES" ]; then
   exit 0
 fi
+
+# Log the review
+LOG_DIR="${CLAUDE_PROJECT_DIR}/.claude/councils"
+mkdir -p "$LOG_DIR"
+COMMIT_SHORT=$(cd "$CLAUDE_PROJECT_DIR" && git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
+echo -e "[$TIMESTAMP] commit:${COMMIT_SHORT}\n${REVIEW}\n---\n" >> "${LOG_DIR}/practices.log"
 
 # Issues found — block stop so Claude sees the feedback and can act on it
 jq -n --arg review "$REVIEW" '{

@@ -13,6 +13,8 @@ Resources:
       Name: medical-validator-api
       Description: Medical Clinic Legal Validator REST API
 
+  # TODO: Complete authorizer once auth Lambda is built.
+  # Needs AuthorizerUri pointing to the JWT validation Lambda ARN.
   JwtAuthorizer:
     Type: AWS::ApiGateway::Authorizer
     Properties:

@@ -149,6 +149,7 @@ export type RedactedVerificationRecord = Omit<
 export const VerifyRequestSchema = z.object({
   companyName: z.string().min(2).max(200),
   jurisdiction: z.string().optional(),
+  forceRefresh: z.boolean().optional(),
 });
 export type VerifyRequest = z.infer<typeof VerifyRequestSchema>;
 

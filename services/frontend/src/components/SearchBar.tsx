@@ -11,13 +11,10 @@ export function SearchBar() {
   const mutation = useMutation({
     mutationFn: () => submitVerification(companyName.trim(), jurisdiction.trim() || undefined),
     onSuccess: (data) => {
-      if (data.cached) {
-        // Cache hit — go straight to results
-        navigate(`/verify/${data.jobId}`);
-      } else {
-        // Fresh job — show progress tracker
-        navigate(`/verify/${data.jobId}`);
-      }
+      const state = data.cached
+        ? { cached: true, cachedAt: data.cachedAt, companyName: companyName.trim(), jurisdiction: jurisdiction.trim() || undefined }
+        : undefined;
+      navigate(`/verify/${data.jobId}`, { state });
       setCompanyName('');
       setJurisdiction('');
     },

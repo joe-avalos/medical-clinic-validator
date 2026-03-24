@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { useHealthCheck } from '../hooks/useHealthCheck.js';
 
 function NavItem({ to, label }: { to: string; label: string }) {
   return (
@@ -18,6 +19,8 @@ function NavItem({ to, label }: { to: string; label: string }) {
 }
 
 export function Layout() {
+  const isConnected = useHealthCheck();
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Nav */}
@@ -41,9 +44,9 @@ export function Layout() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono text-slate-600">
-            <span className="w-1.5 h-1.5 rounded-full bg-risk-low animate-pulse" />
-            Connected
+          <div className={`flex items-center gap-2 text-xs font-mono ${isConnected ? 'text-slate-600' : 'text-risk-high/70'}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-risk-low animate-pulse' : 'bg-risk-high'}`} />
+            {isConnected ? 'Connected' : 'Disconnected'}
           </div>
         </div>
       </nav>

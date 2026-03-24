@@ -46,12 +46,23 @@ api.interceptors.response.use(
   },
 );
 
+export async function checkHealth(): Promise<boolean> {
+  try {
+    await api.get('/health', { timeout: 3000 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function submitVerification(
   companyName: string,
   jurisdiction?: string,
+  forceRefresh?: boolean,
 ): Promise<VerifyResponse> {
-  const body: Record<string, string> = { companyName };
+  const body: Record<string, unknown> = { companyName };
   if (jurisdiction) body.jurisdiction = jurisdiction;
+  if (forceRefresh) body.forceRefresh = true;
   const { data } = await api.post<VerifyResponse>('/verify', body);
   return data;
 }

@@ -4,7 +4,7 @@ import { VerifyRequestSchema } from '@medical-validator/shared';
 import type { JwtClaims } from '@medical-validator/shared';
 import { createJob, getJobStatus, getVerificationResults } from '../clients/dynamodb.js';
 import { sendToVerificationQueue } from '../clients/sqs.js';
-import { getCachedJobId } from '../clients/redis.js';
+import { getCachedJobId, deleteCachedJobId } from '../clients/redis.js';
 
 export const verifyRouter = Router();
 
@@ -45,7 +45,7 @@ verifyRouter.post('/', async (req: Request, res: Response) => {
     return;
   }
 
-  const { companyName, jurisdiction } = parsed.data;
+  const { companyName, jurisdiction, forceRefresh } = parsed.data;
   const user = req.user as JwtClaims;
   const jobId = randomUUID();
   const now = new Date().toISOString();
@@ -53,21 +53,31 @@ verifyRouter.post('/', async (req: Request, res: Response) => {
 
   try {
     // Check Redis cache — return existing jobId immediately if available
-    try {
-      const cached = await getCachedJobId(normalizedName);
-      if (cached) {
-        console.log(`[API] Cache hit for "${normalizedName}" → job ${cached.jobId}`);
-        res.status(200).json({
-          jobId: cached.jobId,
-          status: 'completed',
-          pollUrl: `/verify/${cached.jobId}/status`,
-          cached: true,
-          cachedAt: cached.createdAt,
-        });
-        return;
+    if (!forceRefresh) {
+      try {
+        const cached = await getCachedJobId(normalizedName);
+        if (cached) {
+          console.log(`[API] Cache hit for "${normalizedName}" → job ${cached.jobId}`);
+          res.status(200).json({
+            jobId: cached.jobId,
+            status: 'completed',
+            pollUrl: `/verify/${cached.jobId}/status`,
+            cached: true,
+            cachedAt: cached.createdAt,
+          });
+          return;
+        }
+      } catch (err) {
+        console.warn('[API] Redis cache check failed, proceeding:', (err as Error).message);
       }
-    } catch (err) {
-      console.warn('[API] Redis cache check failed, proceeding:', (err as Error).message);
+    } else {
+      // Force refresh — invalidate existing cache
+      try {
+        await deleteCachedJobId(normalizedName);
+        console.log(`[API] Cache invalidated for "${normalizedName}" (forceRefresh)`);
+      } catch (err) {
+        console.warn('[API] Redis cache delete failed, proceeding:', (err as Error).message);
+      }
     }
 
     await createJob({

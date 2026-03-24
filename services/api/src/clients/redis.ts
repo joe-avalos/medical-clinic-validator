@@ -22,3 +22,8 @@ export async function getCachedJobId(normalizedName: string): Promise<CachedJobR
   if (!raw) return null;
   return JSON.parse(raw) as CachedJobRef;
 }
+
+export async function deleteCachedJobId(normalizedName: string): Promise<void> {
+  const redis = await getClient();
+  await redis.del(`query:job:${normalizedName}`);
+}

@@ -47,28 +47,14 @@ export function ProgressPage() {
     if (isCached) return; // Don't auto-redirect cached results
     if (data?.status === 'completed' && data.results && data.results.length > 0) {
       const timer = setTimeout(() => {
-        const first = data.results![0];
-        const companyNumber = first.companyNumber ?? first.registrationNumber;
-        if (companyNumber) {
-          navigate(`/records/${jobId}/${companyNumber}`);
-        } else {
-          navigate('/records');
-        }
+        navigate(`/verify/${jobId}/results`);
       }, 1500);
       return () => clearTimeout(timer);
     }
   }, [data, jobId, navigate, isCached]);
 
   const handleViewResults = () => {
-    if (data?.results && data.results.length > 0) {
-      const first = data.results[0];
-      const companyNumber = first.companyNumber ?? first.registrationNumber;
-      if (companyNumber) {
-        navigate(`/records/${jobId}/${companyNumber}`);
-        return;
-      }
-    }
-    navigate('/records');
+    navigate(`/verify/${jobId}/results`);
   };
 
   return (

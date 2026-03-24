@@ -1,3 +1,4 @@
+import DOMPurify from 'dompurify';
 import { RiskBadge } from './RiskBadge.js';
 
 interface DetailViewProps {
@@ -89,7 +90,45 @@ export function DetailView({ record }: DetailViewProps) {
         </div>
       )}
 
-      {/* Raw Source Data */}
+      {/* Scraped HTML Preview — styled to match OpenCorporates */}
+      {rawSourceData && typeof rawSourceData.rawHtml === 'string' && (
+        <div className="p-4 bg-slate-850 border border-slate-800 rounded-lg">
+          <p className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">Source Record Preview</p>
+          <div
+            className={[
+              'oc-preview',
+              'p-4 bg-[#f7f7f7] border border-[#e0e0e0] rounded-md text-[13px] text-[#333] overflow-x-auto font-[Helvetica,Arial,sans-serif] leading-relaxed',
+              // list item — remove bullet, add left border accent
+              '[&_li]:list-none [&_li]:border-l-[3px] [&_li]:border-l-[#4a9] [&_li]:pl-3 [&_li]:py-1',
+              // company name link — OC teal, bold
+              '[&_a.company_search_result]:text-[#1a7a7a] [&_a.company_search_result]:font-bold [&_a.company_search_result]:text-[15px] [&_a.company_search_result]:no-underline [&_a.company_search_result]:hover:text-[#145f5f] [&_a.company_search_result]:hover:underline',
+              // jurisdiction filter link — hide (redundant, jurisdiction shown in text)
+              '[&_a.jurisdiction_filter]:hidden',
+              // status badges
+              '[&_.status.label]:inline-block [&_.status.label]:text-[10px] [&_.status.label]:font-bold [&_.status.label]:uppercase [&_.status.label]:tracking-wider [&_.status.label]:px-[6px] [&_.status.label]:py-[2px] [&_.status.label]:rounded-sm [&_.status.label]:mr-1.5 [&_.status.label]:align-middle [&_.status.label]:relative [&_.status.label]:top-[-1px]',
+              // dates
+              '[&_.start_date]:text-[#666] [&_.start_date]:text-[12px]',
+              '[&_.end_date]:text-[#666] [&_.end_date]:text-[12px]',
+              // address
+              '[&_.address]:block [&_.address]:text-[12px] [&_.address]:text-[#888] [&_.address]:mt-0.5',
+              // previous names
+              '[&_.slight_highlight]:text-[12px] [&_.slight_highlight]:text-[#999] [&_.slight_highlight]:italic',
+              // images (flags) — show as small inline
+              '[&_img.flag]:inline [&_img.flag]:w-4 [&_img.flag]:h-3 [&_img.flag]:mr-1.5 [&_img.flag]:align-middle [&_img.flag]:border [&_img.flag]:border-[#ccc] [&_img.flag]:rounded-sm',
+              // hide non-flag images
+              '[&_img:not(.flag)]:hidden',
+            ].join(' ')}
+            dangerouslySetInnerHTML={{
+              __html: DOMPurify.sanitize(rawSourceData.rawHtml as string, {
+                ALLOWED_TAGS: ['li', 'a', 'span', 'br', 'img'],
+                ALLOWED_ATTR: ['class', 'href', 'title', 'alt', 'src'],
+              }),
+            }}
+          />
+        </div>
+      )}
+
+      {/* Raw Audit Data (JSON) */}
       {rawSourceData && Object.keys(rawSourceData).length > 0 && (
         <details className="group">
           <summary className="cursor-pointer text-xs font-mono text-slate-500 uppercase tracking-wider hover:text-slate-400 transition-colors flex items-center gap-1.5">

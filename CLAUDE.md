@@ -154,20 +154,24 @@ Poll for job result.
 {
   "jobId": "job_01J...",
   "status": "completed",
-  "result": {
-    "companyName": "Mayo Health System",
-    "jurisdiction": "us_mn",
-    "registrationNumber": "12345678",
-    "incorporationDate": "1919-01-01",
-    "legalStatus": "Active",
-    "riskLevel": "LOW",
-    "riskFlags": [],
-    "aiSummary": "Entity is actively registered in Minnesota with no anomalies detected.",
-    "cachedResult": false,
-    "validatedAt": "2026-03-20T10:00:00Z"
-  }
+  "results": [
+    {
+      "companyName": "Mayo Health System",
+      "jurisdiction": "us_mn",
+      "registrationNumber": "12345678",
+      "incorporationDate": "1919-01-01",
+      "legalStatus": "Active",
+      "riskLevel": "LOW",
+      "riskFlags": [],
+      "aiSummary": "Entity is actively registered in Minnesota with no anomalies detected.",
+      "cachedResult": false,
+      "validatedAt": "2026-03-20T10:00:00Z"
+    }
+  ]
 }
 ```
+
+> Note: `results` is an array — all OC matches are validated individually and returned. The frontend auto-redirects to the first result after completion.
 
 ---
 
@@ -196,17 +200,21 @@ Call OpenCorporates API
   GET /v0.4/companies/search?q=<name>&jurisdiction_code=<j>
         │
         ▼
-Parse top 5 results (company number, status, jurisdiction, dates)
+Parse all results (company number, status, jurisdiction, dates)
         │
         ▼
-Send to Claude API for validation
+Send each result to Claude API for validation
+  - Batched in groups of 3 (configurable via VALIDATOR_CONCURRENCY)
+  - 1s delay between batches (configurable via VALIDATOR_BATCH_DELAY_MS)
+  - Each company validated individually with retries (CLAUDE_MAX_RETRIES)
+  - Fallback to UNKNOWN risk if all retries exhausted
   - Assess active/inactive status
   - Detect dissolved, suspended, or non-medical entities
   - Assign risk level: LOW / MEDIUM / HIGH / UNKNOWN
   - Generate plain-English summary
         │
         ▼
-Write validated record to DynamoDB
+Write all validated records to DynamoDB
         │
         ▼
 Write to Redis cache (TTL: 24h, key: normalized name)

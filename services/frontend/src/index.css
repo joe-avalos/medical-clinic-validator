@@ -86,3 +86,47 @@ body {
 .stagger-3 { animation-delay: 150ms; }
 .stagger-4 { animation-delay: 200ms; }
 .stagger-5 { animation-delay: 250ms; }
+
+/* OpenCorporates preview — status badge colors */
+.oc-preview li.active > .status.label {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.oc-preview li.inactive > .status.label,
+.oc-preview li.dissolved > .status.label,
+.oc-preview li.suspended > .status.label,
+.oc-preview li.terminated > .status.label {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.oc-preview li:not(.active):not(.inactive):not(.dissolved):not(.suspended):not(.terminated) > .status.label {
+  background: #e2e3e5;
+  color: #383d41;
+  border: 1px solid #d6d8db;
+}
+
+/* Active company name — green left border */
+.oc-preview li.active {
+  border-left-color: #28a745;
+}
+
+.oc-preview li.dissolved,
+.oc-preview li.terminated {
+  border-left-color: #dc3545;
+}
+
+.oc-preview li.inactive,
+.oc-preview li.suspended {
+  border-left-color: #ffc107;
+}
+
+/* Dissolved/inactive company name — dimmed */
+.oc-preview li.dissolved a.company_search_result,
+.oc-preview li.inactive a.company_search_result,
+.oc-preview li.terminated a.company_search_result {
+  color: #888;
+}

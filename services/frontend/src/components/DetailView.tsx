@@ -26,11 +26,18 @@ const COUNTRY_FLAGS: Record<string, string> = {
   za: '🇿🇦', zm: '🇿🇲', zw: '🇿🇼',
 };
 
-function prepareOcHtml(raw: string): string {
+function prepareOcHtml(raw: string): { html: string; ocUrl: string | null } {
   let html = DOMPurify.sanitize(raw, {
     ALLOWED_TAGS: ['li', 'a', 'span', 'br'],
     ALLOWED_ATTR: ['class', 'href', 'title'],
   });
+
+  // Extract company URL from the company_search_result link before rewriting
+  const companyHrefMatch = html.match(/href="(\/companies\/[^"]+)"[^>]*class="[^"]*company_search_result/i)
+    ?? html.match(/class="[^"]*company_search_result[^"]*"[^>]*href="(\/companies\/[^"]+)"/i);
+  const ocUrl = companyHrefMatch
+    ? `https://opencorporates.com${companyHrefMatch[1]}`
+    : null;
 
   // Replace jurisdiction_filter links + flag images with emoji flags
   html = html.replace(
@@ -65,7 +72,7 @@ function prepareOcHtml(raw: string): string {
     'href="https://opencorporates.com/companies/',
   );
 
-  return html;
+  return { html, ocUrl };
 }
 
 interface DetailViewProps {
@@ -159,32 +166,35 @@ export function DetailView({ record }: DetailViewProps) {
 
       {/* Scraped HTML Preview — styled to match OpenCorporates */}
       {rawSourceData && typeof rawSourceData.rawHtml === 'string' && (() => {
-        const ocUrl = typeof rawSourceData.openCorporatesUrl === 'string'
-          ? rawSourceData.openCorporatesUrl
-          : undefined;
+        const prepared = prepareOcHtml(rawSourceData.rawHtml as string);
         return (
           <div className="p-4 bg-slate-850 border border-slate-800 rounded-lg">
             <p className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">
               Source Record Preview
-              {ocUrl && (
-                <a href={ocUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-accent hover:text-accent-hover transition-colors">
+              {prepared.ocUrl && (
+                <a href={prepared.ocUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-accent hover:text-accent-hover transition-colors">
                   ↗
                 </a>
               )}
             </p>
-            <a
-              href={ocUrl ?? '#'}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block no-underline hover:opacity-80 transition-opacity cursor-pointer"
-            >
+            {prepared.ocUrl ? (
+              <a
+                href={prepared.ocUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block no-underline hover:opacity-80 transition-opacity cursor-pointer"
+              >
+                <div
+                  className="oc-preview"
+                  dangerouslySetInnerHTML={{ __html: prepared.html }}
+                />
+              </a>
+            ) : (
               <div
                 className="oc-preview"
-                dangerouslySetInnerHTML={{
-                  __html: prepareOcHtml(rawSourceData.rawHtml as string),
-                }}
+                dangerouslySetInnerHTML={{ __html: prepared.html }}
               />
-            </a>
+            )}
           </div>
         );
       })()}

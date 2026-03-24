@@ -87,11 +87,101 @@ body {
 .stagger-4 { animation-delay: 200ms; }
 .stagger-5 { animation-delay: 250ms; }
 
-/* OpenCorporates preview — status badge colors */
+/* ─── OpenCorporates preview ─── */
+.oc-preview {
+  padding: 10px 14px;
+  background: #fafafa;
+  border: 1px solid #e5e5e5;
+  border-radius: 4px;
+  font: 13px/1.6 "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #333;
+  overflow-x: auto;
+}
+
+.oc-preview li {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+/* Flag emoji */
+.oc-preview .oc-flag {
+  font-size: 14px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+/* Status badge — inline, small caps */
+.oc-preview .status.label {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: lowercase;
+  padding: 1px 5px;
+  border-radius: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+  position: relative;
+  top: -1px;
+}
+
+/* Company name link — OC teal */
+.oc-preview a.company_search_result {
+  color: #0d6d6e;
+  font-weight: 700;
+  font-size: 13px;
+  text-decoration: none;
+}
+.oc-preview a.company_search_result:hover {
+  color: #095455;
+  text-decoration: none;
+}
+
+/* Jurisdiction text after company name — gray, inline */
+.oc-preview li {
+  color: #888;
+}
+
+/* Dates — inline, gray */
+.oc-preview .start_date,
+.oc-preview .end_date {
+  color: #888;
+  font-size: 13px;
+}
+
+/* Map marker — FA map-marker style */
+.oc-preview .oc-pin {
+  display: inline-block;
+  width: 10px;
+  height: 14px;
+  color: #8b1a2b;
+  vertical-align: middle;
+  margin-left: 1px;
+  margin-right: 3px;
+  position: relative;
+  top: -1px;
+}
+
+/* Address — inline, gray */
+.oc-preview .address {
+  color: #999;
+  font-size: 12px;
+}
+.oc-preview .address a {
+  display: none; /* hide "map" links */
+}
+
+/* Previous/alternative names — inline, italic */
+.oc-preview .slight_highlight {
+  color: #999;
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* ─── Status badge colors ─── */
 .oc-preview li.active > .status.label {
   background: #d4edda;
   color: #155724;
-  border: 1px solid #c3e6cb;
 }
 
 .oc-preview li.inactive > .status.label,
@@ -100,33 +190,16 @@ body {
 .oc-preview li.terminated > .status.label {
   background: #f8d7da;
   color: #721c24;
-  border: 1px solid #f5c6cb;
 }
 
 .oc-preview li:not(.active):not(.inactive):not(.dissolved):not(.suspended):not(.terminated) > .status.label {
-  background: #e2e3e5;
-  color: #383d41;
-  border: 1px solid #d6d8db;
-}
-
-/* Active company name — green left border */
-.oc-preview li.active {
-  border-left-color: #28a745;
-}
-
-.oc-preview li.dissolved,
-.oc-preview li.terminated {
-  border-left-color: #dc3545;
-}
-
-.oc-preview li.inactive,
-.oc-preview li.suspended {
-  border-left-color: #ffc107;
+  background: #e8e8e8;
+  color: #555;
 }
 
 /* Dissolved/inactive company name — dimmed */
 .oc-preview li.dissolved a.company_search_result,
 .oc-preview li.inactive a.company_search_result,
 .oc-preview li.terminated a.company_search_result {
-  color: #888;
+  color: #999;
 }

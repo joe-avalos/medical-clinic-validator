@@ -1,6 +1,73 @@
 import DOMPurify from 'dompurify';
 import { RiskBadge } from './RiskBadge.js';
 
+const COUNTRY_FLAGS: Record<string, string> = {
+  ad: '🇦🇩', ae: '🇦🇪', af: '🇦🇫', ag: '🇦🇬', al: '🇦🇱', am: '🇦🇲', ao: '🇦🇴', ar: '🇦🇷',
+  at: '🇦🇹', au: '🇦🇺', az: '🇦🇿', ba: '🇧🇦', bb: '🇧🇧', bd: '🇧🇩', be: '🇧🇪', bf: '🇧🇫',
+  bg: '🇧🇬', bh: '🇧🇭', bi: '🇧🇮', bj: '🇧🇯', bn: '🇧🇳', bo: '🇧🇴', br: '🇧🇷', bs: '🇧🇸',
+  bt: '🇧🇹', bw: '🇧🇼', by: '🇧🇾', bz: '🇧🇿', ca: '🇨🇦', cd: '🇨🇩', cf: '🇨🇫', cg: '🇨🇬',
+  ch: '🇨🇭', ci: '🇨🇮', cl: '🇨🇱', cm: '🇨🇲', cn: '🇨🇳', co: '🇨🇴', cr: '🇨🇷', cu: '🇨🇺',
+  cy: '🇨🇾', cz: '🇨🇿', de: '🇩🇪', dk: '🇩🇰', do: '🇩🇴', dz: '🇩🇿', ec: '🇪🇨', ee: '🇪🇪',
+  eg: '🇪🇬', es: '🇪🇸', et: '🇪🇹', fi: '🇫🇮', fj: '🇫🇯', fr: '🇫🇷', ga: '🇬🇦', gb: '🇬🇧',
+  ge: '🇬🇪', gh: '🇬🇭', gm: '🇬🇲', gn: '🇬🇳', gr: '🇬🇷', gt: '🇬🇹', gw: '🇬🇼', gy: '🇬🇾',
+  hk: '🇭🇰', hn: '🇭🇳', hr: '🇭🇷', ht: '🇭🇹', hu: '🇭🇺', id: '🇮🇩', ie: '🇮🇪', il: '🇮🇱',
+  in: '🇮🇳', iq: '🇮🇶', ir: '🇮🇷', is: '🇮🇸', it: '🇮🇹', jm: '🇯🇲', jo: '🇯🇴', jp: '🇯🇵',
+  ke: '🇰🇪', kg: '🇰🇬', kh: '🇰🇭', kr: '🇰🇷', kw: '🇰🇼', kz: '🇰🇿', la: '🇱🇦', lb: '🇱🇧',
+  lk: '🇱🇰', lr: '🇱🇷', ls: '🇱🇸', lt: '🇱🇹', lu: '🇱🇺', lv: '🇱🇻', ly: '🇱🇾', ma: '🇲🇦',
+  md: '🇲🇩', me: '🇲🇪', mg: '🇲🇬', mk: '🇲🇰', ml: '🇲🇱', mm: '🇲🇲', mn: '🇲🇳', mo: '🇲🇴',
+  mr: '🇲🇷', mt: '🇲🇹', mu: '🇲🇺', mv: '🇲🇻', mw: '🇲🇼', mx: '🇲🇽', my: '🇲🇾', mz: '🇲🇿',
+  na: '🇳🇦', ne: '🇳🇪', ng: '🇳🇬', ni: '🇳🇮', nl: '🇳🇱', no: '🇳🇴', np: '🇳🇵', nz: '🇳🇿',
+  om: '🇴🇲', pa: '🇵🇦', pe: '🇵🇪', pg: '🇵🇬', ph: '🇵🇭', pk: '🇵🇰', pl: '🇵🇱', pr: '🇵🇷',
+  pt: '🇵🇹', py: '🇵🇾', qa: '🇶🇦', ro: '🇷🇴', rs: '🇷🇸', ru: '🇷🇺', rw: '🇷🇼', sa: '🇸🇦',
+  sc: '🇸🇨', sd: '🇸🇩', se: '🇸🇪', sg: '🇸🇬', si: '🇸🇮', sk: '🇸🇰', sl: '🇸🇱', sn: '🇸🇳',
+  so: '🇸🇴', sr: '🇸🇷', sv: '🇸🇻', sy: '🇸🇾', sz: '🇸🇿', td: '🇹🇩', tg: '🇹🇬', th: '🇹🇭',
+  tj: '🇹🇯', tm: '🇹🇲', tn: '🇹🇳', to: '🇹🇴', tr: '🇹🇷', tt: '🇹🇹', tw: '🇹🇼', tz: '🇹🇿',
+  ua: '🇺🇦', ug: '🇺🇬', uk: '🇬🇧', us: '🇺🇸', uy: '🇺🇾', uz: '🇺🇿', ve: '🇻🇪', vn: '🇻🇳',
+  za: '🇿🇦', zm: '🇿🇲', zw: '🇿🇼',
+};
+
+function prepareOcHtml(raw: string): string {
+  let html = DOMPurify.sanitize(raw, {
+    ALLOWED_TAGS: ['li', 'a', 'span', 'br'],
+    ALLOWED_ATTR: ['class', 'href', 'title'],
+  });
+
+  // Replace jurisdiction_filter links + flag images with emoji flags
+  html = html.replace(
+    /<a\s+class="jurisdiction_filter\s+(\w+)"[^>]*>(?:<img[^>]*>)?<\/a>/gi,
+    (_match, code: string) => {
+      const flag = COUNTRY_FLAGS[code.toLowerCase()] ?? '🏳️';
+      return `<span class="oc-flag">${flag}</span>`;
+    },
+  );
+
+  // Catch any remaining <img> flag tags not inside jurisdiction_filter
+  html = html.replace(
+    /<img[^>]*class="flag"[^>]*alt="([^"]*)"[^>]*\/?>/gi,
+    (_match, alt: string) => {
+      const code = alt.toLowerCase().replace(/\s*flag\s*/, '').trim();
+      const mapped = Object.entries(COUNTRY_FLAGS).find(([, v]) =>
+        code.includes(v),
+      );
+      return mapped ? `<span class="oc-flag">${mapped[1]}</span>` : '🏳️';
+    },
+  );
+
+  // Add FA-style map marker before address spans
+  html = html.replace(
+    /<span class="address">/gi,
+    '<svg class="oc-pin" viewBox="0 0 384 512" fill="currentColor"><path d="M172.3 501.7C27 291 0 269.4 0 192 0 86 86 0 192 0s192 86 192 192c0 77.4-27 99-172.3 309.7-9.5 13.8-29.9 13.8-39.5 0zM192 272c44.2 0 80-35.8 80-80s-35.8-80-80-80-80 35.8-80 80 35.8 80 80 80z"/></svg><span class="address">',
+  );
+
+  // Rewrite relative OC links to absolute
+  html = html.replace(
+    /href="\/companies\//g,
+    'href="https://opencorporates.com/companies/',
+  );
+
+  return html;
+}
+
 interface DetailViewProps {
   record: Record<string, unknown>;
 }
@@ -91,42 +158,36 @@ export function DetailView({ record }: DetailViewProps) {
       )}
 
       {/* Scraped HTML Preview — styled to match OpenCorporates */}
-      {rawSourceData && typeof rawSourceData.rawHtml === 'string' && (
-        <div className="p-4 bg-slate-850 border border-slate-800 rounded-lg">
-          <p className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">Source Record Preview</p>
-          <div
-            className={[
-              'oc-preview',
-              'p-4 bg-[#f7f7f7] border border-[#e0e0e0] rounded-md text-[13px] text-[#333] overflow-x-auto font-[Helvetica,Arial,sans-serif] leading-relaxed',
-              // list item — remove bullet, add left border accent
-              '[&_li]:list-none [&_li]:border-l-[3px] [&_li]:border-l-[#4a9] [&_li]:pl-3 [&_li]:py-1',
-              // company name link — OC teal, bold
-              '[&_a.company_search_result]:text-[#1a7a7a] [&_a.company_search_result]:font-bold [&_a.company_search_result]:text-[15px] [&_a.company_search_result]:no-underline [&_a.company_search_result]:hover:text-[#145f5f] [&_a.company_search_result]:hover:underline',
-              // jurisdiction filter link — hide (redundant, jurisdiction shown in text)
-              '[&_a.jurisdiction_filter]:hidden',
-              // status badges
-              '[&_.status.label]:inline-block [&_.status.label]:text-[10px] [&_.status.label]:font-bold [&_.status.label]:uppercase [&_.status.label]:tracking-wider [&_.status.label]:px-[6px] [&_.status.label]:py-[2px] [&_.status.label]:rounded-sm [&_.status.label]:mr-1.5 [&_.status.label]:align-middle [&_.status.label]:relative [&_.status.label]:top-[-1px]',
-              // dates
-              '[&_.start_date]:text-[#666] [&_.start_date]:text-[12px]',
-              '[&_.end_date]:text-[#666] [&_.end_date]:text-[12px]',
-              // address
-              '[&_.address]:block [&_.address]:text-[12px] [&_.address]:text-[#888] [&_.address]:mt-0.5',
-              // previous names
-              '[&_.slight_highlight]:text-[12px] [&_.slight_highlight]:text-[#999] [&_.slight_highlight]:italic',
-              // images (flags) — show as small inline
-              '[&_img.flag]:inline [&_img.flag]:w-4 [&_img.flag]:h-3 [&_img.flag]:mr-1.5 [&_img.flag]:align-middle [&_img.flag]:border [&_img.flag]:border-[#ccc] [&_img.flag]:rounded-sm',
-              // hide non-flag images
-              '[&_img:not(.flag)]:hidden',
-            ].join(' ')}
-            dangerouslySetInnerHTML={{
-              __html: DOMPurify.sanitize(rawSourceData.rawHtml as string, {
-                ALLOWED_TAGS: ['li', 'a', 'span', 'br', 'img'],
-                ALLOWED_ATTR: ['class', 'href', 'title', 'alt', 'src'],
-              }),
-            }}
-          />
-        </div>
-      )}
+      {rawSourceData && typeof rawSourceData.rawHtml === 'string' && (() => {
+        const ocUrl = typeof rawSourceData.openCorporatesUrl === 'string'
+          ? rawSourceData.openCorporatesUrl
+          : undefined;
+        return (
+          <div className="p-4 bg-slate-850 border border-slate-800 rounded-lg">
+            <p className="text-xs font-mono text-slate-500 uppercase tracking-wider mb-3">
+              Source Record Preview
+              {ocUrl && (
+                <a href={ocUrl} target="_blank" rel="noopener noreferrer" className="ml-2 text-accent hover:text-accent-hover transition-colors">
+                  ↗
+                </a>
+              )}
+            </p>
+            <a
+              href={ocUrl ?? '#'}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block no-underline hover:opacity-80 transition-opacity cursor-pointer"
+            >
+              <div
+                className="oc-preview"
+                dangerouslySetInnerHTML={{
+                  __html: prepareOcHtml(rawSourceData.rawHtml as string),
+                }}
+              />
+            </a>
+          </div>
+        );
+      })()}
 
       {/* Raw Audit Data (JSON) */}
       {rawSourceData && Object.keys(rawSourceData).length > 0 && (

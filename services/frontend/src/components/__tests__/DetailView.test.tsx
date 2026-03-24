@@ -116,7 +116,6 @@ describe('DetailView', () => {
     };
     render(<DetailView record={record} />);
     expect(screen.getByText('Source Record Preview')).toBeInTheDocument();
-    // The sanitized HTML should render the link text
     const preview = screen.getByText('Test Clinic', { selector: '.oc-preview a' });
     expect(preview).toBeInTheDocument();
   });
@@ -153,17 +152,31 @@ describe('DetailView', () => {
     expect(screen.queryByText('Source Record Preview')).not.toBeInTheDocument();
   });
 
-  it('allows flag images but sanitizes src attribute', () => {
+  it('replaces flag images with emoji flags', () => {
     const record = {
       ...baseRecord,
       rawSourceData: {
-        rawHtml: '<li><img class="flag" src="/assets/flags/us.gif" alt="US flag" /><span>Company</span></li>',
+        rawHtml: '<li><a class="jurisdiction_filter us" href="/companies/us_mn"><img class="flag" src="/assets/flags/us.gif" alt="US flag"></a><a class="company_search_result" href="/test">Company</a></li>',
       },
     };
     const { container } = render(<DetailView record={record} />);
-    // img tags are now allowed for flags
-    const img = container.querySelector('img.flag');
-    expect(img).not.toBeNull();
-    expect(img?.getAttribute('alt')).toBe('US flag');
+    const flag = container.querySelector('.oc-flag');
+    expect(flag).not.toBeNull();
+    expect(flag?.textContent).toBe('🇺🇸');
+    // img should be stripped
+    expect(container.querySelector('img')).toBeNull();
+  });
+
+  it('adds map marker SVG before address spans', () => {
+    const record = {
+      ...baseRecord,
+      rawSourceData: {
+        rawHtml: '<li><a class="company_search_result" href="/test">Company</a><span class="address">123 Main St</span></li>',
+      },
+    };
+    const { container } = render(<DetailView record={record} />);
+    const pin = container.querySelector('svg.oc-pin');
+    expect(pin).not.toBeNull();
+    expect(pin?.tagName.toLowerCase()).toBe('svg');
   });
 });

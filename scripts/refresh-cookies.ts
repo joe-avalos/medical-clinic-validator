@@ -16,6 +16,8 @@ const COOKIES_PATH = resolve(
   process.env.OC_COOKIES_PATH || '.oc-cookies.json',
 );
 const OC_BASE = process.env.OC_BASE_URL || 'https://opencorporates.com';
+const OC_EMAIL = process.env.OC_EMAIL || '';
+const OC_PASSWORD = process.env.OC_PASSWORD || '';
 
 function waitForEnter(prompt: string): Promise<void> {
   const rl = createInterface({ input: process.stdin, output: process.stdout });
@@ -38,8 +40,26 @@ async function main(): Promise<void> {
 
   await page.goto(`${OC_BASE}/users/sign_in`, { waitUntil: 'networkidle2' });
 
-  console.log('=== ACTION REQUIRED ===');
-  console.log('1. Log in to OpenCorporates in the browser window');
+  // Auto-fill email and password from .env
+  if (OC_EMAIL) {
+    const emailField = await page.$('input[type="email"], input[name*="email"], #user_email');
+    if (emailField) {
+      await emailField.click({ clickCount: 3 });
+      await emailField.type(OC_EMAIL);
+      console.log(`Email pre-filled: ${OC_EMAIL}`);
+    }
+  }
+  if (OC_PASSWORD) {
+    const passField = await page.$('input[type="password"], input[name*="password"], #user_password');
+    if (passField) {
+      await passField.click({ clickCount: 3 });
+      await passField.type(OC_PASSWORD);
+      console.log('Password pre-filled: ****');
+    }
+  }
+
+  console.log('\n=== ACTION REQUIRED ===');
+  console.log('1. Credentials have been pre-filled — click Sign In');
   console.log('2. Solve any CAPTCHA if prompted');
   console.log('3. Once you see the dashboard/search page, come back here');
   console.log('=======================\n');

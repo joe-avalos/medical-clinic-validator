@@ -31,6 +31,22 @@ async function main(): Promise<void> {
     const page = await browser.newPage();
     await page.goto(`${OC_BASE}/users/sign_in`, { waitUntil: 'networkidle2' });
 
+    // Dismiss cookie consent banner (page may reload after)
+    try {
+      const rejectBtn = await page.$('button.cky-btn-reject');
+      if (rejectBtn) {
+        await Promise.all([
+          page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 5000 }).catch(() => {}),
+          rejectBtn.click(),
+        ]);
+        console.log('Cookie consent rejected');
+        // Wait for login form to be ready after potential reload
+        await page.waitForSelector('#user_email', { timeout: 5000 });
+      }
+    } catch (err) {
+      console.warn('Could not dismiss cookie banner:', (err as Error).message);
+    }
+
     // Auto-fill credentials from .env
     if (OC_EMAIL) {
       try {

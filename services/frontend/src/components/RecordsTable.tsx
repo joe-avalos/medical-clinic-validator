@@ -32,7 +32,7 @@ export function RecordsTable({ records, isLoading }: RecordsTableProps) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div>
       <table className="w-full">
         <thead>
           <tr className="border-b border-slate-800">

@@ -1,7 +1,7 @@
 import { VerificationJobMessageSchema } from '@medical-validator/shared';
 import type { ScraperResultMessage, Scope, VerificationRecord } from '@medical-validator/shared';
 import { updateJobStatus, getRecordsByJobId, putVerificationRecords } from '../shared/dynamodb.js';
-import { getCachedJobId } from '../shared/redis.js';
+import { getCachedJobId, deleteCachedJobId } from '../shared/redis.js';
 import { TTL_DAYS } from '../shared/constants.js';
 import { createScraperProvider } from './scraper-provider.js';
 import { sendMessage } from '../shared/sqs.js';
@@ -36,8 +36,25 @@ export async function handleScraperMessage(body: unknown): Promise<void> {
   try {
     companies = await provider.search(message.normalizedName, message.jurisdiction);
   } catch (err) {
-    await updateJobStatus(message.jobId, 'failed', (err as Error).message);
-    throw err;
+    const errorMsg = (err as Error).message;
+    console.error(`[scraper] Job ${message.jobId} failed:`, errorMsg);
+    await updateJobStatus(message.jobId, 'failed', errorMsg);
+
+    // Invalidate cache on stale cookie errors so subsequent searches
+    // don't keep returning old cached results from the API layer
+    if (errorMsg.includes('STALE_COOKIES')) {
+      try {
+        await deleteCachedJobId(message.normalizedName);
+        console.log(`[scraper] Cache invalidated for "${message.normalizedName}" due to stale cookies`);
+      } catch (cacheErr) {
+        console.warn('[scraper] Failed to invalidate cache:', (cacheErr as Error).message);
+      }
+    }
+
+    // Return (don't throw) — job is already marked failed in DynamoDB.
+    // Throwing would leave the SQS message in-flight, blocking the FIFO
+    // message group and preventing new jobs for the same company name.
+    return;
   }
 
   // 4. Publish ScraperResultMessage to validation queue

@@ -217,7 +217,7 @@ describe('handleScraperMessage', () => {
       mockGetCachedJobId.mockResolvedValue(null);
       mockSearch.mockRejectedValue(new Error('CAPTCHA persists'));
 
-      await expect(handleScraperMessage(VALID_MESSAGE)).rejects.toThrow();
+      await handleScraperMessage(VALID_MESSAGE);
 
       expect(mockUpdateJobStatus).toHaveBeenCalledWith(
         VALID_MESSAGE.jobId,

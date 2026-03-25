@@ -17,9 +17,8 @@ puppeteer.use(StealthPlugin());
 const OC_BASE = process.env.OC_BASE_URL || 'https://opencorporates.com';
 const PAGE_TIMEOUT = Number(process.env.SCRAPER_PAGE_TIMEOUT_MS) || 15000;
 const MAX_RETRIES = Number(process.env.SCRAPER_MAX_RETRIES) || 3;
-const COOKIES_PATH = process.env.OC_COOKIES_PATH || join(
-  dirname(fileURLToPath(import.meta.url)), '..', '..', '.oc-cookies.json',
-);
+const WORKER_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const COOKIES_PATH = join(WORKER_ROOT, process.env.OC_COOKIES_PATH || '.oc-cookies.json');
 
 const USER_AGENTS = [
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
@@ -70,7 +69,7 @@ export class OpenCorporatesProvider implements ScraperProvider {
           path: c.path || '/',
         }));
     } catch (err) {
-      throw new Error(`Failed to load cookies from ${COOKIES_PATH}: ${(err as Error).message}`);
+      throw new Error(`STALE_COOKIES: Failed to load cookies from ${COOKIES_PATH} — refresh by running: npm run cookie:refresh`);
     }
   }
 
@@ -124,11 +123,11 @@ export class OpenCorporatesProvider implements ScraperProvider {
 
           const hasCaptcha = await page.$('.g-recaptcha, [data-sitekey], #captcha');
           if (hasCaptcha) {
-            throw new Error('CAPTCHA detected on results page');
+            throw new Error('STALE_COOKIES: CAPTCHA detected — refresh cookies by running: npm run cookie:refresh');
           }
 
           if (page.url().includes('/users/sign_in')) {
-            throw new Error('Session expired — update cookies in .oc-cookies.json');
+            throw new Error('STALE_COOKIES: Session expired — refresh cookies by running: npm run cookie:refresh');
           }
 
           const html = await page.content();

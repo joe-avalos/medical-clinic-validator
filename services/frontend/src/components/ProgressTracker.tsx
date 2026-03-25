@@ -115,7 +115,9 @@ export function ProgressTracker({
       {status === 'failed' && errorMessage && (
         <div className="mt-4 px-4 py-3 bg-risk-high-bg border border-risk-high/20 rounded-lg animate-fade-in">
           <p className="text-xs font-mono text-risk-high uppercase tracking-wider mb-1">Error</p>
-          <p className="text-sm text-slate-300 font-mono">{errorMessage}</p>
+          <p className="text-sm text-slate-300 font-mono">
+            {errorMessage.replace(/^STALE_COOKIES:\s*/, '')}
+          </p>
         </div>
       )}
     </div>

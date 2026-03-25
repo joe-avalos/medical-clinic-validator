@@ -31,6 +31,10 @@ export async function getCachedJobId(
   return JSON.parse(raw) as CachedJobRef;
 }
 
+export async function deleteCachedJobId(normalizedName: string): Promise<void> {
+  await getClient().del(`${QUERY_KEY_PREFIX}${normalizedName}`);
+}
+
 export async function setCachedJobId(
   normalizedName: string,
   jobId: string,

@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import request from 'supertest';
 import { createToken, JWT_SECRET } from '../../test-utils/fixtures.js';
 
+// Mock logger
+vi.mock('../../shared/logger.js', () => {
+  const noop = vi.fn();
+  const childLogger = { info: noop, warn: noop, error: noop, debug: noop, fatal: noop, child: () => childLogger };
+  return { createLogger: () => childLogger };
+});
+
 process.env.JWT_SECRET = JWT_SECRET;
 
 // Mock clients before importing app

@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { RawCompanyRecord, VerificationJobMessage, VerificationRecord } from '@medical-validator/shared';
 
+// Mock logger (must be before handler import)
+vi.mock('../../shared/logger.js', () => {
+  const noop = vi.fn();
+  const childLogger = { info: noop, warn: noop, error: noop, debug: noop, fatal: noop, child: () => childLogger };
+  return { createLogger: () => childLogger };
+});
+
 // Mock dependencies before importing handler
 const mockGetCachedJobId = vi.fn();
 vi.mock('../../shared/redis.js', () => ({

@@ -3,6 +3,13 @@ import express, { type Request, type Response, type NextFunction } from 'express
 import request from 'supertest';
 import { createToken, createExpiredToken, JWT_SECRET } from '../../test-utils/fixtures.js';
 
+// Mock logger
+vi.mock('../../shared/logger.js', () => {
+  const noop = vi.fn();
+  const childLogger = { info: noop, warn: noop, error: noop, debug: noop, fatal: noop, child: () => childLogger };
+  return { createLogger: () => childLogger };
+});
+
 // Set JWT_SECRET env before importing auth middleware
 process.env.JWT_SECRET = JWT_SECRET;
 

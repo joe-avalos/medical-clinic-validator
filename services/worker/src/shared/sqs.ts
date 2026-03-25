@@ -4,6 +4,9 @@ import {
   DeleteMessageCommand,
   SendMessageCommand,
 } from '@aws-sdk/client-sqs';
+import { createLogger } from './logger.js';
+
+const log = createLogger('sqs');
 
 const sqs = new SQSClient({
   endpoint: process.env.SQS_ENDPOINT || 'http://localhost:4566',
@@ -24,7 +27,7 @@ export async function pollQueue(
   handler: SqsHandler,
   signal?: AbortSignal,
 ): Promise<void> {
-  console.log(`[SQS] Polling ${queueUrl}`);
+  log.info({ queueUrl }, 'Polling started');
 
   while (!signal?.aborted) {
     try {
@@ -42,7 +45,7 @@ export async function pollQueue(
 
       for (const message of result.Messages) {
         if (!message.Body || !message.ReceiptHandle) {
-          console.warn('[SQS] Received message with missing Body or ReceiptHandle, skipping');
+          log.warn('Received message with missing Body or ReceiptHandle, skipping');
           continue;
         }
 
@@ -57,17 +60,17 @@ export async function pollQueue(
             }),
           );
         } catch (err) {
-          console.error('[SQS] Handler error, message will return to queue:', err);
+          log.error({ err }, 'Handler error, message will return to queue');
         }
       }
     } catch (err) {
       if (signal?.aborted) break;
-      console.error('[SQS] Poll error, retrying in 5s:', err);
+      log.error({ err }, 'Poll error, retrying in 5s');
       await new Promise((resolve) => setTimeout(resolve, 5000));
     }
   }
 
-  console.log('[SQS] Polling stopped');
+  log.info('Polling stopped');
 }
 
 /**

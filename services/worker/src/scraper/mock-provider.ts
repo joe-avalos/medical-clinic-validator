@@ -1,5 +1,8 @@
 import type { RawCompanyRecord } from '@medical-validator/shared';
 import type { ScraperProvider } from './scraper-provider.js';
+import { createLogger } from '../shared/logger.js';
+
+const log = createLogger('mock-scraper');
 
 const FIXTURES: Record<string, RawCompanyRecord[]> = {
   default: [
@@ -75,7 +78,7 @@ function resolveScenario(name: string): string {
 export class MockScraperProvider implements ScraperProvider {
   async search(name: string, _jurisdiction?: string): Promise<RawCompanyRecord[]> {
     const scenario = resolveScenario(name);
-    console.log(`[mock-scraper] Returning "${scenario}" fixture for "${name}"`);
+    log.info({ scenario, name }, 'Returning mock fixture');
     return FIXTURES[scenario];
   }
 }

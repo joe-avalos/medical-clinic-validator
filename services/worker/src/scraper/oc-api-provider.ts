@@ -1,6 +1,8 @@
 import type { RawCompanyRecord } from '@medical-validator/shared';
 import type { ScraperProvider } from './scraper-provider.js';
+import { createLogger } from '../shared/logger.js';
 
+const log = createLogger('oc-api');
 const OC_API_BASE = process.env.OC_API_BASE_URL || 'https://api.opencorporates.com';
 const OC_API_TOKEN = process.env.OC_API_TOKEN || '';
 
@@ -22,7 +24,7 @@ export class OCApiProvider implements ScraperProvider {
     if (OC_API_TOKEN) params.set('api_token', OC_API_TOKEN);
 
     const url = `${OC_API_BASE}/v0.4/companies/search?${params.toString()}`;
-    console.log(`[oc-api] Fetching ${url.replace(OC_API_TOKEN, '***')}`);
+    log.info({ url: url.replace(OC_API_TOKEN, '***') }, 'Fetching');
 
     const res = await fetch(url);
     if (!res.ok) {

@@ -5,6 +5,18 @@ import type {
   ValidationResultMessage,
 } from '@medical-validator/shared';
 
+// Mock logger (must be before handler import)
+vi.mock('../../shared/logger.js', () => {
+  const noop = vi.fn();
+  const childLogger = { info: noop, warn: noop, error: noop, debug: noop, fatal: noop, child: () => childLogger };
+  return { createLogger: () => childLogger };
+});
+
+// Mock telemetry (must be before handler import)
+vi.mock('../../shared/telemetry.js', () => ({
+  writeTelemetry: vi.fn(),
+}));
+
 // Mock dependencies before importing handler
 const mockUpdateJobStatus = vi.fn();
 const mockPutVerificationRecords = vi.fn();

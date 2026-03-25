@@ -5,6 +5,13 @@ import type {
   ValidationResult,
 } from '@medical-validator/shared';
 
+// Mock logger (must be before handler import)
+vi.mock('../../shared/logger.js', () => {
+  const noop = vi.fn();
+  const childLogger = { info: noop, warn: noop, error: noop, debug: noop, fatal: noop, child: () => childLogger };
+  return { createLogger: () => childLogger };
+});
+
 // Mock dependencies
 const mockValidateAll = vi.fn();
 vi.mock('../ai-provider.js', () => ({

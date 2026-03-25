@@ -3,6 +3,9 @@ import type { RawCompanyRecord, ValidationResult } from '@medical-validator/shar
 import type { AIProvider } from './ai-provider.js';
 import { buildSystemPrompt, buildUserPrompt } from './prompts.js';
 import { buildFallbackResult } from '../shared/constants.js';
+import { createLogger } from '../shared/logger.js';
+
+const log = createLogger('ai-validator');
 
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'mistral:7b-instruct';
@@ -47,9 +50,9 @@ export class OllamaProvider implements AIProvider {
         const parsed = JSON.parse(cleaned);
         return ValidationResultSchema.parse(parsed);
       } catch (err) {
-        console.warn(`[ai-validator] Ollama ${company.name} attempt ${attempt}/${MAX_RETRIES} failed:`, (err as Error).message);
+        log.warn({ company: company.name, attempt, maxRetries: MAX_RETRIES, err: (err as Error).message }, 'Ollama validation attempt failed');
         if (attempt === MAX_RETRIES) {
-          console.error(`[ai-validator] Ollama ${company.name}: all retries exhausted, returning fallback`);
+          log.error({ company: company.name, outcome: 'fallback' }, 'Ollama all retries exhausted — returning fallback');
           return buildFallbackResult(company);
         }
       }

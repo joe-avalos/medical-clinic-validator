@@ -49,6 +49,12 @@ Resources:
                   - !Sub "arn:aws:dynamodb:${Region}:${AccountId}:table/verifications/index/*"
               - Effect: Allow
                 Action:
+                  - dynamodb:Query
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${Region}:${AccountId}:table/job_telemetry"
+                  - !Sub "arn:aws:dynamodb:${Region}:${AccountId}:table/job_telemetry/index/*"
+              - Effect: Allow
+                Action:
                   - secretsmanager:GetSecretValue
                 Resource:
                   - !Sub "arn:aws:secretsmanager:${Region}:${AccountId}:secret:medical-validator/secrets*"
@@ -162,6 +168,11 @@ Resources:
                   - dynamodb:UpdateItem
                 Resource:
                   - !Sub "arn:aws:dynamodb:${Region}:${AccountId}:table/jobs"
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${Region}:${AccountId}:table/job_telemetry"
 
 Outputs:
   ApiRoleArn:

@@ -1,6 +1,9 @@
 import jwt from 'jsonwebtoken';
 import type { Request, Response, NextFunction } from 'express';
 import type { JwtClaims } from '@medical-validator/shared';
+import { createLogger } from '../shared/logger.js';
+
+const log = createLogger('auth');
 
 const VALID_SCOPES = ['internal', 'external'];
 
@@ -19,7 +22,7 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
 
   const secret = process.env.JWT_SECRET;
   if (!secret) {
-    console.error('[AUTH] JWT_SECRET environment variable not configured');
+    log.error('JWT_SECRET environment variable not configured');
     res.status(500).json({ error: 'Server configuration error' });
     return;
   }

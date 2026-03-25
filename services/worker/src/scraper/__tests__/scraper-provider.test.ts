@@ -1,5 +1,12 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 
+// Mock logger
+vi.mock('../../shared/logger.js', () => {
+  const noop = vi.fn();
+  const childLogger = { info: noop, warn: noop, error: noop, debug: noop, fatal: noop, child: () => childLogger };
+  return { createLogger: () => childLogger };
+});
+
 describe('createScraperProvider', () => {
   const originalEnv = process.env.SCRAPER_PROVIDER;
 

@@ -1,11 +1,13 @@
 import { createClient } from 'redis';
+import { createLogger } from '../shared/logger.js';
 
+const log = createLogger('redis');
 let client: ReturnType<typeof createClient> | null = null;
 
 async function getClient() {
   if (!client) {
     client = createClient({ url: process.env.REDIS_URL || 'redis://localhost:6379' });
-    client.on('error', (err) => console.warn('[redis] Connection error:', err.message));
+    client.on('error', (err) => log.warn({ err: err.message }, 'Connection error'));
     await client.connect();
   }
   return client;

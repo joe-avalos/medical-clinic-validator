@@ -4,6 +4,9 @@ import type { RawCompanyRecord, ValidationResult } from '@medical-validator/shar
 import type { AIProvider } from './ai-provider.js';
 import { buildSystemPrompt, buildUserPrompt } from './prompts.js';
 import { buildFallbackResult } from '../shared/constants.js';
+import { createLogger } from '../shared/logger.js';
+
+const log = createLogger('ai-validator');
 
 const MODEL = process.env.CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
 const MAX_TOKENS = Number(process.env.CLAUDE_MAX_TOKENS) || 1536;
@@ -35,13 +38,13 @@ export class AnthropicProvider implements AIProvider {
       return [await this.validateOne(companies[0])];
     }
 
-    console.log(`[ai-validator] Validating ${companies.length} companies (concurrency: ${CONCURRENCY})`);
+    log.info({ companyCount: companies.length, concurrency: CONCURRENCY }, 'Batch validation starting');
 
     const batches = chunk(companies, CONCURRENCY);
     const results: ValidationResult[] = [];
 
     for (let i = 0; i < batches.length; i++) {
-      console.log(`[ai-validator] Batch ${i + 1}/${batches.length} (${batches[i].length} concurrent calls)`);
+      log.info({ batch: i + 1, totalBatches: batches.length, batchSize: batches[i].length }, 'Processing batch');
       const batchResults = await Promise.all(batches[i].map((c) => this.validateOne(c)));
       results.push(...batchResults);
 
@@ -50,7 +53,7 @@ export class AnthropicProvider implements AIProvider {
       }
     }
 
-    console.log(`[ai-validator] Completed ${results.length} individual validations`);
+    log.info({ completedCount: results.length }, 'Batch validation complete');
     return results;
   }
 
@@ -81,9 +84,9 @@ export class AnthropicProvider implements AIProvider {
         }
         return ValidationResultSchema.parse(parsed);
       } catch (err) {
-        console.warn(`[ai-validator] ${company.name} attempt ${attempt}/${MAX_RETRIES} failed:`, (err as Error).message);
+        log.warn({ company: company.name, attempt, maxRetries: MAX_RETRIES, err: (err as Error).message }, 'Validation attempt failed');
         if (attempt === MAX_RETRIES) {
-          console.error(`[ai-validator] ${company.name}: all retries exhausted, returning fallback`);
+          log.error({ company: company.name, outcome: 'fallback' }, 'All retries exhausted — returning fallback');
           return buildFallbackResult(company);
         }
       }

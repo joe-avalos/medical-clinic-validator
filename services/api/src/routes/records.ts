@@ -2,6 +2,9 @@ import { Router, type Request, type Response } from 'express';
 import { RiskLevel } from '@medical-validator/shared';
 import type { JwtClaims } from '@medical-validator/shared';
 import { queryRecords } from '../clients/dynamodb.js';
+import { createLogger } from '../shared/logger.js';
+
+const log = createLogger('api');
 
 export const recordsRouter = Router();
 
@@ -74,7 +77,7 @@ recordsRouter.get('/', async (req: Request, res: Response) => {
 
     res.json(response);
   } catch (err) {
-    console.error('[API] GET /records failed:', (err as Error).message);
+    log.error({ err: (err as Error).message }, 'GET /records failed');
     res.status(500).json({ error: 'Failed to retrieve records' });
   }
 });

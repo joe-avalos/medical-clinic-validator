@@ -29,6 +29,47 @@ export type JobStatus = z.infer<typeof JobStatus>;
 export const Scope = z.enum(['internal', 'external']);
 export type Scope = z.infer<typeof Scope>;
 
+// ─── Pipeline Telemetry ─────────────────────────────────────────────
+
+// Accumulated across workers via SQS message payload
+export const PipelineTelemetrySchema = z.object({
+  scraperProvider: z.string(),
+  cacheHit: z.boolean(),
+  companiesFound: z.number(),
+  scrapeStartedAt: z.string().datetime(),
+  aiProvider: z.string().optional(),
+  validationOutcomes: z.object({
+    success: z.number(),
+    fallback: z.number(),
+    empty: z.number(),
+  }).optional(),
+  pipelinePath: z.string().optional(),
+});
+export type PipelineTelemetry = z.infer<typeof PipelineTelemetrySchema>;
+
+// Job telemetry table record (written by storage worker)
+export interface JobTelemetry {
+  pk: string;              // JOB#<jobId>
+  sk: string;              // TELEMETRY
+  jobId: string;
+  companyName: string;
+  normalizedName: string;
+  scraperProvider: string;
+  aiProvider: string;
+  cacheHit: boolean;
+  companiesFound: number;
+  pipelinePath: string;
+  validationOutcomes: {
+    success: number;
+    fallback: number;
+    empty: number;
+  };
+  errorMessage: string | null;
+  durationMs: number;
+  createdAt: string;
+  ttl: number;
+}
+
 // ─── SQS Messages ──────────────────────────────────────────────────
 
 // Orchestrator → Scraper (verification-queue.fifo)
@@ -62,6 +103,7 @@ export const ScraperResultMessageSchema = z.object({
   cachedResult: z.boolean(),
   companies: z.array(RawCompanyRecordSchema),
   scrapedAt: z.string().datetime(),
+  telemetry: PipelineTelemetrySchema.optional(),
 });
 export type ScraperResultMessage = z.infer<typeof ScraperResultMessageSchema>;
 
@@ -89,6 +131,7 @@ export const ValidationResultMessageSchema = z.object({
   validations: z.array(ValidationResultSchema),
   validatedAt: z.string().datetime(),
   rawSourceData: z.array(RawCompanyRecordSchema),
+  telemetry: PipelineTelemetrySchema.optional(),
 });
 export type ValidationResultMessage = z.infer<typeof ValidationResultMessageSchema>;
 

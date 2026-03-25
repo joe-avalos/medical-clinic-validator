@@ -1,10 +1,13 @@
 import { VerificationJobMessageSchema } from '@medical-validator/shared';
-import type { ScraperResultMessage, Scope, VerificationRecord } from '@medical-validator/shared';
+import type { PipelineTelemetry, ScraperResultMessage, Scope, VerificationRecord } from '@medical-validator/shared';
 import { updateJobStatus, getRecordsByJobId, putVerificationRecords } from '../shared/dynamodb.js';
 import { getCachedJobId, deleteCachedJobId } from '../shared/redis.js';
 import { TTL_DAYS } from '../shared/constants.js';
 import { createScraperProvider } from './scraper-provider.js';
 import { sendMessage } from '../shared/sqs.js';
+import { createLogger } from '../shared/logger.js';
+
+const logger = createLogger('scraper');
 
 const VALIDATION_QUEUE_URL =
   process.env.SQS_VALIDATION_QUEUE_URL ||
@@ -14,7 +17,9 @@ const provider = createScraperProvider();
 
 export async function handleScraperMessage(body: unknown): Promise<void> {
   const message = VerificationJobMessageSchema.parse(body);
-  console.log(`[scraper] Received job ${message.jobId} for "${message.companyName}"`);
+  const log = logger.child({ jobId: message.jobId, companyName: message.companyName });
+  const scraperProvider = process.env.SCRAPER_PROVIDER || 'opencorporates-api';
+  log.info({ scraperProvider }, 'Received job');
 
   // 1. Update job status → processing
   await updateJobStatus(message.jobId, 'processing');
@@ -23,21 +28,22 @@ export async function handleScraperMessage(body: unknown): Promise<void> {
   try {
     const cached = await getCachedJobId(message.normalizedName);
     if (cached) {
-      console.log(`[scraper] Cache hit for "${message.normalizedName}" → job ${cached.jobId}`);
+      log.info({ cacheHit: true, cachedJobId: cached.jobId }, 'Cache hit — skipping scrape');
       await copyCachedResults(message.jobId, cached.jobId, cached.createdAt, message.scope);
       return;
     }
   } catch (err) {
-    console.warn('[scraper] Redis read failed, proceeding without cache:', (err as Error).message);
+    log.warn({ err: (err as Error).message }, 'Redis read failed, proceeding without cache');
   }
 
   // 3. Scrape (cache miss)
+  log.info({ cacheHit: false, scraperProvider }, 'Cache miss — starting scrape');
   let companies;
   try {
     companies = await provider.search(message.normalizedName, message.jurisdiction);
   } catch (err) {
     const errorMsg = (err as Error).message;
-    console.error(`[scraper] Job ${message.jobId} failed:`, errorMsg);
+    log.error({ err: errorMsg, scraperProvider }, 'Scrape failed');
     await updateJobStatus(message.jobId, 'failed', errorMsg);
 
     // Invalidate cache on stale cookie errors so subsequent searches
@@ -45,9 +51,9 @@ export async function handleScraperMessage(body: unknown): Promise<void> {
     if (errorMsg.includes('STALE_COOKIES')) {
       try {
         await deleteCachedJobId(message.normalizedName);
-        console.log(`[scraper] Cache invalidated for "${message.normalizedName}" due to stale cookies`);
+        log.info('Cache invalidated due to stale cookies');
       } catch (cacheErr) {
-        console.warn('[scraper] Failed to invalidate cache:', (cacheErr as Error).message);
+        log.warn({ err: (cacheErr as Error).message }, 'Failed to invalidate cache');
       }
     }
 
@@ -57,7 +63,17 @@ export async function handleScraperMessage(body: unknown): Promise<void> {
     return;
   }
 
-  // 4. Publish ScraperResultMessage to validation queue
+  log.info({ companiesFound: companies.length, scraperProvider }, 'Scrape complete');
+
+  // 4. Build telemetry snapshot
+  const telemetry: PipelineTelemetry = {
+    scraperProvider,
+    cacheHit: false,
+    companiesFound: companies.length,
+    scrapeStartedAt: message.enqueuedAt,
+  };
+
+  // 5. Publish ScraperResultMessage to validation queue
   const result: ScraperResultMessage = {
     jobId: message.jobId,
     normalizedName: message.normalizedName,
@@ -65,10 +81,11 @@ export async function handleScraperMessage(body: unknown): Promise<void> {
     cachedResult: false,
     companies,
     scrapedAt: new Date().toISOString(),
+    telemetry,
   };
 
   await sendMessage(VALIDATION_QUEUE_URL, result, message.jobId);
-  console.log(`[scraper] Published result for job ${message.jobId} (${companies.length} companies)`);
+  log.info({ companiesFound: companies.length }, 'Published to validation queue');
 }
 
 async function copyCachedResults(
@@ -80,7 +97,7 @@ async function copyCachedResults(
   const originalRecords = await getRecordsByJobId(originalJobId);
 
   if (originalRecords.length === 0) {
-    console.warn(`[scraper] Cached job ${originalJobId} has no records, falling through to scrape`);
+    logger.warn({ newJobId, originalJobId }, 'Cached job has no records, falling through to scrape');
     // Can't short-circuit — let the job fail gracefully
     await updateJobStatus(newJobId, 'failed', 'Cached job had no records');
     return;
@@ -103,7 +120,7 @@ async function copyCachedResults(
 
   await putVerificationRecords(copies);
   await updateJobStatus(newJobId, 'completed');
-  console.log(`[scraper] Copied ${copies.length} cached records from job ${originalJobId} → ${newJobId}`);
+  logger.info({ newJobId, originalJobId, recordsCopied: copies.length }, 'Copied cached records');
 }
 
 export async function shutdownScraper(): Promise<void> {

@@ -1,21 +1,24 @@
 import { pollQueue } from './shared/sqs.js';
 import { getSecrets } from './shared/secrets.js';
+import { createLogger } from './shared/logger.js';
 
 const WORKER_TYPE = process.env.WORKER_TYPE;
 
 if (!WORKER_TYPE) {
-  console.error('WORKER_TYPE env var is required. Options: scraper, ai-validator, storage');
+  const boot = createLogger('bootstrap');
+  boot.fatal('WORKER_TYPE env var is required. Options: scraper, ai-validator, storage');
   process.exit(1);
 }
 
+const log = createLogger(WORKER_TYPE);
 const ac = new AbortController();
 
 process.on('SIGINT', () => {
-  console.log(`[${WORKER_TYPE}] Shutting down...`);
+  log.info('Shutting down (SIGINT)');
   ac.abort();
 });
 process.on('SIGTERM', () => {
-  console.log(`[${WORKER_TYPE}] Shutting down...`);
+  log.info('Shutting down (SIGTERM)');
   ac.abort();
 });
 
@@ -25,7 +28,7 @@ async function main(): Promise<void> {
   process.env.ANTHROPIC_API_KEY = secrets.ANTHROPIC_API_KEY;
   process.env.OC_API_TOKEN = secrets.OC_API_TOKEN;
 
-  console.log(`[${WORKER_TYPE}] Starting worker`);
+  log.info('Starting worker');
 
   switch (WORKER_TYPE) {
     case 'scraper': {
@@ -51,12 +54,12 @@ async function main(): Promise<void> {
       break;
     }
     default:
-      console.error(`Unknown WORKER_TYPE: ${WORKER_TYPE}. Options: scraper, ai-validator, storage`);
+      log.fatal({ workerType: WORKER_TYPE }, 'Unknown WORKER_TYPE. Options: scraper, ai-validator, storage');
       process.exit(1);
   }
 }
 
 main().catch((err) => {
-  console.error(`[${WORKER_TYPE}] Fatal error:`, err);
+  log.fatal({ err }, 'Fatal error');
   process.exit(1);
 });

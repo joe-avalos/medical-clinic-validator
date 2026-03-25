@@ -5,7 +5,9 @@ import type { JwtClaims } from '@medical-validator/shared';
 import { createJob, getJobStatus, getVerificationResults } from '../clients/dynamodb.js';
 import { sendToVerificationQueue } from '../clients/sqs.js';
 import { getCachedJobId, deleteCachedJobId } from '../clients/redis.js';
+import { createLogger } from '../shared/logger.js';
 
+const logger = createLogger('api');
 export const verifyRouter = Router();
 
 const REDACTED_FIELDS = [
@@ -57,7 +59,7 @@ verifyRouter.post('/', async (req: Request, res: Response) => {
       try {
         const cached = await getCachedJobId(normalizedName);
         if (cached) {
-          console.log(`[API] Cache hit for "${normalizedName}" → job ${cached.jobId}`);
+          logger.info({ normalizedName, cachedJobId: cached.jobId }, 'Cache hit');
           res.status(200).json({
             jobId: cached.jobId,
             status: 'completed',
@@ -68,15 +70,15 @@ verifyRouter.post('/', async (req: Request, res: Response) => {
           return;
         }
       } catch (err) {
-        console.warn('[API] Redis cache check failed, proceeding:', (err as Error).message);
+        logger.warn({ err: (err as Error).message }, 'Redis cache check failed, proceeding');
       }
     } else {
       // Force refresh — invalidate existing cache
       try {
         await deleteCachedJobId(normalizedName);
-        console.log(`[API] Cache invalidated for "${normalizedName}" (forceRefresh)`);
+        logger.info({ normalizedName }, 'Cache invalidated (forceRefresh)');
       } catch (err) {
-        console.warn('[API] Redis cache delete failed, proceeding:', (err as Error).message);
+        logger.warn({ err: (err as Error).message }, 'Redis cache delete failed, proceeding');
       }
     }
 
@@ -102,7 +104,7 @@ verifyRouter.post('/', async (req: Request, res: Response) => {
       pollUrl: `/verify/${jobId}/status`,
     });
   } catch (err) {
-    console.error('[API] POST /verify failed:', (err as Error).message);
+    logger.error({ err: (err as Error).message }, 'POST /verify failed');
     res.status(500).json({ error: 'Failed to enqueue verification job' });
   }
 });
@@ -137,7 +139,7 @@ verifyRouter.get('/:id/status', async (req: Request, res: Response) => {
 
     res.json(response);
   } catch (err) {
-    console.error('[API] GET /verify/:id/status failed:', (err as Error).message);
+    logger.error({ err: (err as Error).message }, 'GET /verify/:id/status failed');
     res.status(500).json({ error: 'Failed to retrieve job status' });
   }
 });

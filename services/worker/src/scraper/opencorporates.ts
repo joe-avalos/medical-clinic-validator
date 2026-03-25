@@ -7,6 +7,9 @@ import type { Browser, Page, CookieParam } from 'puppeteer';
 import type { RawCompanyRecord } from '@medical-validator/shared';
 import type { ScraperProvider } from './scraper-provider.js';
 import { parseSearchResults } from './opencorporates-parser.js';
+import { createLogger } from '../shared/logger.js';
+
+const log = createLogger('scraper');
 
 const puppeteer = puppeteerExtra as unknown as {
   use(plugin: unknown): void;
@@ -78,7 +81,7 @@ export class OpenCorporatesProvider implements ScraperProvider {
     const cookies = this.loadCookiesFromFile();
     await page.setCookie(...cookies);
     this.cookiesLoaded = true;
-    console.log('[scraper] Session cookies injected');
+    log.info('Session cookies injected');
   }
 
   private buildSearchUrl(normalizedName: string, jurisdiction?: string): string {
@@ -134,7 +137,7 @@ export class OpenCorporatesProvider implements ScraperProvider {
           return parseSearchResults(html);
         } catch (err) {
           lastError = err as Error;
-          console.warn(`[scraper] Attempt ${attempt}/${MAX_RETRIES} failed:`, (err as Error).message);
+          log.warn({ attempt, maxRetries: MAX_RETRIES, err: (err as Error).message }, 'Scrape attempt failed');
           if (attempt < MAX_RETRIES) {
             await randomDelay();
           }

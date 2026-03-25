@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { RawCompanyRecord, ValidationResult } from '@medical-validator/shared';
 
+// Mock logger
+vi.mock('../../shared/logger.js', () => {
+  const noop = vi.fn();
+  const childLogger = { info: noop, warn: noop, error: noop, debug: noop, fatal: noop, child: () => childLogger };
+  return { createLogger: () => childLogger };
+});
+
 const mockCreate = vi.fn();
 vi.mock('@anthropic-ai/sdk', () => ({
   default: class {

@@ -1,5 +1,7 @@
 import { Redis } from 'ioredis';
+import { createLogger } from './logger.js';
 
+const log = createLogger('redis');
 const CACHE_TTL = 86400; // 24 hours
 const QUERY_KEY_PREFIX = 'query:job:';
 
@@ -12,7 +14,7 @@ function getClient(): Redis {
       lazyConnect: true,
     });
     redis.on('error', (err: Error) => {
-      console.warn('[redis] Connection error:', err.message);
+      log.warn({ err: err.message }, 'Connection error');
     });
   }
   return redis;

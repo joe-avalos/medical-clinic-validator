@@ -1,5 +1,13 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { RawCompanyRecordSchema } from '@medical-validator/shared';
+
+// Mock logger
+vi.mock('../../shared/logger.js', () => {
+  const noop = vi.fn();
+  const childLogger = { info: noop, warn: noop, error: noop, debug: noop, fatal: noop, child: () => childLogger };
+  return { createLogger: () => childLogger };
+});
+
 import { MockScraperProvider } from '../mock-provider.js';
 
 describe('MockScraperProvider', () => {

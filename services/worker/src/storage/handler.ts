@@ -3,10 +3,15 @@ import type { VerificationRecord } from '@medical-validator/shared';
 import { updateJobStatus, putVerificationRecords } from '../shared/dynamodb.js';
 import { setCachedJobId } from '../shared/redis.js';
 import { TTL_DAYS } from '../shared/constants.js';
+import { createLogger } from '../shared/logger.js';
+import { writeTelemetry } from '../shared/telemetry.js';
+
+const logger = createLogger('storage');
 
 export async function handleStorageMessage(body: unknown): Promise<void> {
   const message = ValidationResultMessageSchema.parse(body);
-  console.log(`[storage] Received job ${message.jobId} — ${message.validations.length} validations`);
+  const log = logger.child({ jobId: message.jobId });
+  log.info({ validationCount: message.validations.length }, 'Received job');
 
   const now = new Date();
   const ttl = Math.floor(now.getTime() / 1000) + TTL_DAYS * 24 * 60 * 60;
@@ -61,9 +66,28 @@ export async function handleStorageMessage(body: unknown): Promise<void> {
     try {
       await setCachedJobId(message.normalizedName, message.jobId, now.toISOString());
     } catch (err) {
-      console.warn('[storage] Redis cache write failed:', (err as Error).message);
+      log.warn({ err: (err as Error).message }, 'Redis cache write failed');
     }
   }
 
-  console.log(`[storage] Job ${message.jobId}: ${records.length} records persisted and marked completed`);
+  log.info({ recordCount: records.length }, 'Records persisted and job marked completed');
+
+  // Write telemetry row (non-blocking — failure doesn't affect the job)
+  if (message.telemetry) {
+    const t = message.telemetry;
+    const durationMs = Date.now() - new Date(t.scrapeStartedAt).getTime();
+    await writeTelemetry({
+      jobId: message.jobId,
+      companyName: records[0]?.companyName ?? message.normalizedName,
+      normalizedName: message.normalizedName,
+      scraperProvider: t.scraperProvider,
+      aiProvider: t.aiProvider ?? 'unknown',
+      cacheHit: t.cacheHit,
+      companiesFound: t.companiesFound,
+      pipelinePath: t.pipelinePath ?? 'unknown',
+      validationOutcomes: t.validationOutcomes ?? { success: 0, fallback: 0, empty: 0 },
+      errorMessage: null,
+      durationMs,
+    });
+  }
 }

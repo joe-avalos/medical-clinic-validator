@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-worker:
+    name: Worker Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix shared
+      - run: npm ci --prefix services/worker
+      - run: npm test --prefix services/worker
+
+  test-api:
+    name: API Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix shared
+      - run: npm ci --prefix services/api
+      - run: npm test --prefix services/api
+
+  test-frontend:
+    name: Frontend Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix shared
+      - run: npm ci --prefix services/frontend
+      - run: npm test --prefix services/frontend
+
+  lint:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm ci --prefix shared
+      - run: npm ci --prefix services/api
+      - run: npm ci --prefix services/worker
+      - run: npm ci --prefix services/frontend
+      - run: npm run lint --prefix services/api
+      - run: npm run lint --prefix services/frontend

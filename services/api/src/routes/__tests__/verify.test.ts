@@ -19,6 +19,13 @@ vi.mock('../../clients/dynamodb.js', () => ({
   getVerificationResults: mockGetVerificationResults,
 }));
 
+const mockGetCachedJobId = vi.fn();
+const mockDeleteCachedJobId = vi.fn();
+vi.mock('../../clients/redis.js', () => ({
+  getCachedJobId: mockGetCachedJobId,
+  deleteCachedJobId: mockDeleteCachedJobId,
+}));
+
 describe('POST /verify', () => {
   let app: any;
 
@@ -26,6 +33,8 @@ describe('POST /verify', () => {
     vi.resetAllMocks();
     mockSendToVerificationQueue.mockResolvedValue(undefined);
     mockCreateJob.mockResolvedValue(undefined);
+    mockGetCachedJobId.mockResolvedValue(null);
+    mockDeleteCachedJobId.mockResolvedValue(undefined);
     const mod = await import('../../app.js');
     app = mod.app;
   });

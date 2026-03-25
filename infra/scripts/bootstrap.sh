@@ -27,7 +27,7 @@ awslocal cloudformation deploy \
   --no-fail-on-empty-changeset
 
 # 3. IAM roles
-echo "[3/4] Deploying IAM stack..."
+echo "[3/5] Deploying IAM stack..."
 awslocal cloudformation deploy \
   --template-file "${STACK_DIR}/iam.yaml" \
   --stack-name medical-validator-iam \
@@ -35,8 +35,21 @@ awslocal cloudformation deploy \
   --capabilities CAPABILITY_NAMED_IAM \
   --no-fail-on-empty-changeset
 
-# 4. API Gateway
-echo "[4/4] Deploying API Gateway stack..."
+# 4. Secrets Manager
+echo "[4/5] Deploying Secrets Manager stack..."
+awslocal cloudformation deploy \
+  --template-file "${STACK_DIR}/secretsmanager.yaml" \
+  --stack-name medical-validator-secrets \
+  --parameter-overrides Environment=local \
+  --no-fail-on-empty-changeset
+
+echo "Seeding secrets into Secrets Manager..."
+awslocal secretsmanager put-secret-value \
+  --secret-id medical-validator/secrets \
+  --secret-string "{\"JWT_SECRET\":\"${JWT_SECRET:-dev-jwt-secret}\",\"ANTHROPIC_API_KEY\":\"${ANTHROPIC_API_KEY:-}\",\"OC_API_TOKEN\":\"${OC_API_TOKEN:-}\"}"
+
+# 5. API Gateway
+echo "[5/5] Deploying API Gateway stack..."
 awslocal cloudformation deploy \
   --template-file "${STACK_DIR}/api-gateway.yaml" \
   --stack-name medical-validator-api-gateway \
@@ -58,6 +71,10 @@ awslocal sqs list-queues
 echo ""
 echo "IAM roles:"
 awslocal iam list-roles --query 'Roles[?starts_with(RoleName, `medical-validator`)].RoleName'
+
+echo ""
+echo "Secrets:"
+awslocal secretsmanager list-secrets --query 'SecretList[].Name'
 
 echo ""
 echo "=== Bootstrap complete ==="

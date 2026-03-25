@@ -3,8 +3,10 @@ services:
     image: localstack/localstack:3
     ports:
       - "4566:4566"
+    env_file:
+      - .env
     environment:
-      SERVICES: sqs,dynamodb,apigateway,iam,cloudformation
+      SERVICES: sqs,dynamodb,apigateway,iam,cloudformation,secretsmanager
       EAGER_SERVICE_LOADING: 1
     volumes:
       - ./infra/scripts/bootstrap.sh:/etc/localstack/init/ready.d/bootstrap.sh

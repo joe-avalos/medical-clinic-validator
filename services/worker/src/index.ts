@@ -1,4 +1,5 @@
 import { pollQueue } from './shared/sqs.js';
+import { getSecrets } from './shared/secrets.js';
 
 const WORKER_TYPE = process.env.WORKER_TYPE;
 
@@ -19,6 +20,11 @@ process.on('SIGTERM', () => {
 });
 
 async function main(): Promise<void> {
+  // Fetch secrets before dynamic imports so module-level process.env reads pick them up
+  const secrets = await getSecrets();
+  process.env.ANTHROPIC_API_KEY = secrets.ANTHROPIC_API_KEY;
+  process.env.OC_API_TOKEN = secrets.OC_API_TOKEN;
+
   console.log(`[${WORKER_TYPE}] Starting worker`);
 
   switch (WORKER_TYPE) {

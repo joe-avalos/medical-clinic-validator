@@ -47,6 +47,11 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:dynamodb:${Region}:${AccountId}:table/verifications"
                   - !Sub "arn:aws:dynamodb:${Region}:${AccountId}:table/verifications/index/*"
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Sub "arn:aws:secretsmanager:${Region}:${AccountId}:secret:medical-validator/secrets*"
 
   # --- Scraper Worker Role ---
   ScraperWorkerRole:
@@ -82,6 +87,11 @@ Resources:
                   - dynamodb:UpdateItem
                 Resource:
                   - !Sub "arn:aws:dynamodb:${Region}:${AccountId}:table/jobs"
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Sub "arn:aws:secretsmanager:${Region}:${AccountId}:secret:medical-validator/secrets*"
 
   # --- AI Validator Worker Role ---
   ValidatorWorkerRole:
@@ -112,6 +122,11 @@ Resources:
                   - sqs:SendMessage
                 Resource:
                   - !Sub "arn:aws:sqs:${Region}:${AccountId}:storage-queue.fifo"
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                Resource:
+                  - !Sub "arn:aws:secretsmanager:${Region}:${AccountId}:secret:medical-validator/secrets*"
 
   # --- Storage Worker Role ---
   StorageWorkerRole:

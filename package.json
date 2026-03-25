@@ -14,6 +14,7 @@
     "dev:frontend": "cd services/frontend && npm run dev",
     "infra:up": "docker compose up -d --wait",
     "infra:down": "docker compose down",
+    "infra:reset": "bash infra/reset.sh",
     "infra:logs": "docker compose logs -f",
     "cookie:refresh": "tsx scripts/refresh-cookies.ts",
     "build": "tsc"

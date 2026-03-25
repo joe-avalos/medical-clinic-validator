@@ -5,6 +5,7 @@ import { ProgressPage } from './pages/ProgressPage.js';
 import { JobResultsPage } from './pages/JobResultsPage.js';
 import { ResultsPage } from './pages/ResultsPage.js';
 import { DetailPage } from './pages/DetailPage.js';
+import { TelemetryPage } from './pages/TelemetryPage.js';
 
 const router = createBrowserRouter([
   {
@@ -15,6 +16,7 @@ const router = createBrowserRouter([
       { path: '/verify/:jobId/results', element: <JobResultsPage /> },
       { path: '/records', element: <ResultsPage /> },
       { path: '/records/:jobId/:companyNumber', element: <DetailPage /> },
+      { path: '/telemetry', element: <TelemetryPage /> },
     ],
   },
 ]);

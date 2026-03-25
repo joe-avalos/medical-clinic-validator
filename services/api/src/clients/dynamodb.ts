@@ -17,6 +17,7 @@ const docClient = DynamoDBDocumentClient.from(client);
 
 const JOBS_TABLE = process.env.DYNAMODB_TABLE_JOBS || 'jobs';
 const VERIFICATIONS_TABLE = process.env.DYNAMODB_TABLE_VERIFICATIONS || 'verifications';
+const TELEMETRY_TABLE = process.env.DYNAMODB_TABLE_TELEMETRY || 'job_telemetry';
 
 export interface CreateJobInput {
   jobId: string;
@@ -100,6 +101,57 @@ export async function queryRecords(
     result = await docClient.send(
       new ScanCommand({
         TableName: VERIFICATIONS_TABLE,
+        Limit: input.limit,
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+  }
+
+  const records = (result.Items ?? []) as Record<string, unknown>[];
+
+  let nextCursor: string | undefined;
+  if (result.LastEvaluatedKey) {
+    nextCursor = Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64url');
+  }
+
+  return { records, total: result.Count ?? records.length, nextCursor };
+}
+
+export interface QueryTelemetryInput {
+  pipelinePath?: string;
+  limit: number;
+  cursor?: string;
+}
+
+export async function queryTelemetry(
+  input: QueryTelemetryInput,
+): Promise<{ records: Record<string, unknown>[]; total: number; nextCursor?: string }> {
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+  if (input.cursor) {
+    try {
+      exclusiveStartKey = JSON.parse(Buffer.from(input.cursor, 'base64url').toString());
+    } catch {
+      throw new Error('Invalid cursor format');
+    }
+  }
+
+  let result;
+  if (input.pipelinePath) {
+    result = await docClient.send(
+      new QueryCommand({
+        TableName: TELEMETRY_TABLE,
+        IndexName: 'pipelinePath-createdAt-index',
+        KeyConditionExpression: 'pipelinePath = :pp',
+        ExpressionAttributeValues: { ':pp': input.pipelinePath },
+        Limit: input.limit,
+        ScanIndexForward: false,
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+  } else {
+    result = await docClient.send(
+      new ScanCommand({
+        TableName: TELEMETRY_TABLE,
         Limit: input.limit,
         ExclusiveStartKey: exclusiveStartKey,
       }),

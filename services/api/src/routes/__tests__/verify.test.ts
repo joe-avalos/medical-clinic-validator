@@ -24,6 +24,7 @@ vi.mock('../../clients/dynamodb.js', () => ({
   createJob: mockCreateJob,
   getJobStatus: mockGetJobStatus,
   getVerificationResults: mockGetVerificationResults,
+  queryTelemetry: vi.fn().mockResolvedValue({ records: [], total: 0 }),
 }));
 
 const mockGetCachedJobId = vi.fn();

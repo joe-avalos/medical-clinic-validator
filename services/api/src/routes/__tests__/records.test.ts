@@ -17,6 +17,7 @@ vi.mock('../../clients/dynamodb.js', () => ({
   getJobStatus: vi.fn(),
   getVerificationResults: vi.fn(),
   queryRecords: mockQueryRecords,
+  queryTelemetry: vi.fn().mockResolvedValue({ records: [], total: 0 }),
 }));
 
 vi.mock('../../clients/sqs.js', () => ({

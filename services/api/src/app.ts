@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { authMiddleware } from './middleware/auth.js';
 import { verifyRouter } from './routes/verify.js';
 import { recordsRouter } from './routes/records.js';
+import { telemetryRouter } from './routes/telemetry.js';
 
 export const app = express();
 
@@ -30,3 +31,4 @@ app.use(authMiddleware);
 
 app.use('/verify', verifyRouter);
 app.use('/records', recordsRouter);
+app.use('/telemetry', telemetryRouter);

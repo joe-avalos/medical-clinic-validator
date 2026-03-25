@@ -41,6 +41,7 @@ export function Layout() {
             <div className="flex items-center gap-1">
               <NavItem to="/" label="Search" />
               <NavItem to="/records" label="Records" />
+              <NavItem to="/telemetry" label="Telemetry" />
             </div>
           </div>
 

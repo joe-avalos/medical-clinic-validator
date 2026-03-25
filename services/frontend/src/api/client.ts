@@ -72,6 +72,40 @@ export async function fetchJobStatus(jobId: string): Promise<JobStatusResponse> 
   return data;
 }
 
+export interface TelemetryRecord {
+  jobId: string;
+  companyName: string;
+  normalizedName: string;
+  scraperProvider: string;
+  aiProvider: string;
+  cacheHit: boolean;
+  companiesFound: number;
+  pipelinePath: string;
+  validationOutcomes: { success: number; fallback: number; empty: number };
+  errorMessage: string | null;
+  durationMs: number;
+  createdAt: string;
+}
+
+export interface TelemetryResponse {
+  records: TelemetryRecord[];
+  total: number;
+  nextCursor?: string;
+}
+
+export async function fetchTelemetry(params: {
+  pipelinePath?: string;
+  limit?: number;
+  cursor?: string;
+}): Promise<TelemetryResponse> {
+  const query: Record<string, string> = {};
+  if (params.pipelinePath) query.pipelinePath = params.pipelinePath;
+  if (params.limit) query.limit = String(params.limit);
+  if (params.cursor) query.cursor = params.cursor;
+  const { data } = await api.get<TelemetryResponse>('/telemetry', { params: query });
+  return data;
+}
+
 export async function fetchRecords(params: {
   riskLevel?: RiskLevel;
   limit?: number;

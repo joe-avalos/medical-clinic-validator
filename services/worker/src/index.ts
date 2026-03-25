@@ -28,7 +28,17 @@ async function main(): Promise<void> {
   process.env.ANTHROPIC_API_KEY = secrets.ANTHROPIC_API_KEY;
   process.env.OC_API_TOKEN = secrets.OC_API_TOKEN;
 
-  log.info('Starting worker');
+  log.info(
+    {
+      WORKER_TYPE,
+      SCRAPER_PROVIDER: process.env.SCRAPER_PROVIDER ?? '(unset)',
+      AI_PROVIDER: process.env.AI_PROVIDER ?? '(unset)',
+      REDIS_URL: process.env.REDIS_URL ?? '(unset)',
+      SQS_ENDPOINT: process.env.SQS_ENDPOINT ?? '(unset)',
+      NODE_ENV: process.env.NODE_ENV ?? '(unset)',
+    },
+    'Starting worker',
+  );
 
   switch (WORKER_TYPE) {
     case 'scraper': {

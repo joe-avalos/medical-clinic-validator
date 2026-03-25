@@ -6,7 +6,7 @@ import {
   QueryCommand,
   ScanCommand,
 } from '@aws-sdk/lib-dynamodb';
-import type { JobStatus } from '@medical-validator/shared';
+import type { JobStatus, JobTelemetry } from '@medical-validator/shared';
 
 const client = new DynamoDBClient({
   endpoint: process.env.DYNAMODB_ENDPOINT || 'http://localhost:4566',
@@ -115,6 +115,43 @@ export async function queryRecords(
   }
 
   return { records, total: result.Count ?? records.length, nextCursor };
+}
+
+export async function createTelemetryRecord(params: {
+  jobId: string;
+  companyName: string;
+  normalizedName: string;
+  scraperProvider: string;
+}): Promise<void> {
+  const now = new Date();
+  const ttl = Math.floor(now.getTime() / 1000) + 30 * 24 * 60 * 60;
+
+  const item: JobTelemetry = {
+    pk: `JOB#${params.jobId}`,
+    sk: 'TELEMETRY',
+    jobId: params.jobId,
+    companyName: params.companyName,
+    normalizedName: params.normalizedName,
+    scraperProvider: params.scraperProvider,
+    aiProvider: 'pending',
+    cacheHit: false,
+    companiesFound: 0,
+    scrapeAttempts: 0,
+    scrapeErrors: [],
+    pipelinePath: 'submitted',
+    validationOutcomes: { success: 0, fallback: 0, empty: 0 },
+    errorMessage: null,
+    durationMs: 0,
+    createdAt: now.toISOString(),
+    ttl,
+  };
+
+  await docClient.send(
+    new PutCommand({
+      TableName: TELEMETRY_TABLE,
+      Item: item,
+    }),
+  );
 }
 
 export interface QueryTelemetryInput {

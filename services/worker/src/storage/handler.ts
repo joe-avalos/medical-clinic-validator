@@ -16,16 +16,27 @@ export async function handleStorageMessage(body: unknown): Promise<void> {
   const now = new Date();
   const ttl = Math.floor(now.getTime() / 1000) + TTL_DAYS * 24 * 60 * 60;
 
-  // Build one record per validation result
-  const records: VerificationRecord[] = message.validations.map((v, i) => {
+  // Build one record per validation result, keyed by jurisdiction + registration number
+  // to avoid duplicate pk+sk when the same company number appears across jurisdictions
+  const seen = new Set<string>();
+  const records: VerificationRecord[] = [];
+  for (let i = 0; i < message.validations.length; i++) {
+    const v = message.validations[i];
+    const sk = `RESULT#${v.jurisdiction}#${v.registrationNumber}`;
+    if (seen.has(sk)) {
+      log.warn({ sk, companyName: v.companyName }, 'Skipping duplicate result');
+      continue;
+    }
+    seen.add(sk);
+
     // Match validation to its source company by registration number
     const sourceCompany = message.rawSourceData.find(
       (c) => c.companyNumber === v.registrationNumber,
     ) ?? message.rawSourceData[i];
 
-    return {
+    records.push({
       pk: `JOB#${message.jobId}`,
-      sk: `RESULT#${v.registrationNumber}`,
+      sk,
       jobId: message.jobId,
       companyNumber: v.registrationNumber,
       companyName: v.companyName,
@@ -49,8 +60,8 @@ export async function handleStorageMessage(body: unknown): Promise<void> {
       validatedAt: message.validatedAt,
       ttl,
       scope: message.scope,
-    };
-  });
+    });
+  }
 
   try {
     await putVerificationRecords(records);
@@ -84,6 +95,8 @@ export async function handleStorageMessage(body: unknown): Promise<void> {
       aiProvider: t.aiProvider ?? 'unknown',
       cacheHit: t.cacheHit,
       companiesFound: t.companiesFound,
+      scrapeAttempts: t.scrapeAttempts ?? 1,
+      scrapeErrors: t.scrapeErrors ?? [],
       pipelinePath: t.pipelinePath ?? 'unknown',
       validationOutcomes: t.validationOutcomes ?? { success: 0, fallback: 0, empty: 0 },
       errorMessage: null,

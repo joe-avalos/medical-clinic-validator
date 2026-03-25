@@ -89,7 +89,7 @@ describe('handleStorageMessage', () => {
       expect.arrayContaining([
         expect.objectContaining({
           pk: 'JOB#job-001',
-          sk: 'RESULT#0f23674b',
+          sk: 'RESULT#us_mn#0f23674b',
           jobId: 'job-001',
           companyNumber: '0f23674b',
           companyName: 'MAYO HEALTH SYSTEM',
@@ -128,8 +128,8 @@ describe('handleStorageMessage', () => {
 
     const records = mockPutVerificationRecords.mock.calls[0][0];
     expect(records).toHaveLength(2);
-    expect(records[0].sk).toBe('RESULT#0f23674b');
-    expect(records[1].sk).toBe('RESULT#xyz-7890');
+    expect(records[0].sk).toBe('RESULT#us_mn#0f23674b');
+    expect(records[1].sk).toBe('RESULT#us_fl#xyz-7890');
   });
 
   it('stores individual company rawApiSnapshot (not array)', async () => {

@@ -25,12 +25,17 @@ vi.mock('../../shared/dynamodb.js', () => ({
 
 const mockSearch = vi.fn();
 vi.mock('../scraper-provider.js', () => ({
-  createScraperProvider: () => ({ search: mockSearch }),
+  createScraperProvider: () => ({ search: mockSearch, providerName: 'mock', lastScrapeStats: null }),
 }));
 
 const mockSendMessage = vi.fn();
 vi.mock('../../shared/sqs.js', () => ({
   sendMessage: mockSendMessage,
+}));
+
+const mockWriteTelemetry = vi.fn();
+vi.mock('../../shared/telemetry.js', () => ({
+  writeTelemetry: mockWriteTelemetry,
 }));
 
 const VALID_MESSAGE: VerificationJobMessage = {
@@ -58,7 +63,7 @@ const FAKE_COMPANIES: RawCompanyRecord[] = [
 const FAKE_CACHED_RECORDS: VerificationRecord[] = [
   {
     pk: 'JOB#job-original',
-    sk: 'RESULT#0f23674b',
+    sk: 'RESULT#us_mn#0f23674b',
     jobId: 'job-original',
     companyNumber: '0f23674b',
     companyName: 'MAYO HEALTH SYSTEM',
@@ -230,6 +235,23 @@ describe('handleScraperMessage', () => {
         VALID_MESSAGE.jobId,
         'failed',
         expect.stringContaining('CAPTCHA'),
+      );
+    });
+
+    it('writes telemetry with error details on scrape failure', async () => {
+      mockGetCachedJobId.mockResolvedValue(null);
+      mockSearch.mockRejectedValue(new Error('Invalid cookie fields'));
+
+      await handleScraperMessage(VALID_MESSAGE);
+
+      expect(mockWriteTelemetry).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobId: VALID_MESSAGE.jobId,
+          scraperProvider: 'mock',
+          pipelinePath: 'scrape→failed',
+          errorMessage: 'Invalid cookie fields',
+          companiesFound: 0,
+        }),
       );
     });
   });

@@ -16,7 +16,7 @@ vi.mock('@aws-sdk/lib-dynamodb', () => ({
   DynamoDBDocumentClient: {
     from: () => ({ send: mockSend }),
   },
-  PutCommand: class {
+  UpdateCommand: class {
     constructor(public input: unknown) {}
   },
 }));
@@ -40,44 +40,36 @@ describe('writeTelemetry', () => {
     aiProvider: 'anthropic',
     cacheHit: false,
     companiesFound: 3,
+    scrapeAttempts: 2,
+    scrapeErrors: ['STALE_COOKIES: CAPTCHA detected — refresh cookies by running: npm run cookie:refresh'],
     pipelinePath: 'scrape→validate→store',
     validationOutcomes: { success: 2, fallback: 1, empty: 0 },
     errorMessage: null,
     durationMs: 4523,
   };
 
-  it('calls DynamoDB PutCommand with correct pk/sk', async () => {
+  it('calls DynamoDB UpdateCommand with correct key', async () => {
     await writeTelemetry(SAMPLE_TELEMETRY);
 
     expect(mockSend).toHaveBeenCalledTimes(1);
-    const putCmd = mockSend.mock.calls[0][0];
-    expect(putCmd.input.Item.pk).toBe('JOB#job-001');
-    expect(putCmd.input.Item.sk).toBe('TELEMETRY');
+    const cmd = mockSend.mock.calls[0][0];
+    expect(cmd.input.Key).toEqual({ pk: 'JOB#job-001', sk: 'TELEMETRY' });
   });
 
-  it('sets TTL to 30 days from now', async () => {
+  it('sets all telemetry fields in ExpressionAttributeValues', async () => {
     await writeTelemetry(SAMPLE_TELEMETRY);
 
-    const putCmd = mockSend.mock.calls[0][0];
-    const now = Math.floor(Date.now() / 1000);
-    const thirtyDays = 30 * 24 * 60 * 60;
-    expect(putCmd.input.Item.ttl).toBeGreaterThanOrEqual(now + thirtyDays - 5);
-    expect(putCmd.input.Item.ttl).toBeLessThanOrEqual(now + thirtyDays + 5);
-  });
-
-  it('includes all telemetry fields', async () => {
-    await writeTelemetry(SAMPLE_TELEMETRY);
-
-    const item = mockSend.mock.calls[0][0].input.Item;
-    expect(item.jobId).toBe('job-001');
-    expect(item.scraperProvider).toBe('opencorporates');
-    expect(item.aiProvider).toBe('anthropic');
-    expect(item.cacheHit).toBe(false);
-    expect(item.companiesFound).toBe(3);
-    expect(item.pipelinePath).toBe('scrape→validate→store');
-    expect(item.validationOutcomes).toEqual({ success: 2, fallback: 1, empty: 0 });
-    expect(item.durationMs).toBe(4523);
-    expect(item.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    const values = mockSend.mock.calls[0][0].input.ExpressionAttributeValues;
+    expect(values[':sp']).toBe('opencorporates');
+    expect(values[':ai']).toBe('anthropic');
+    expect(values[':ch']).toBe(false);
+    expect(values[':cf']).toBe(3);
+    expect(values[':sa']).toBe(2);
+    expect(values[':se']).toEqual(['STALE_COOKIES: CAPTCHA detected — refresh cookies by running: npm run cookie:refresh']);
+    expect(values[':pp']).toBe('scrape→validate→store');
+    expect(values[':vo']).toEqual({ success: 2, fallback: 1, empty: 0 });
+    expect(values[':dur']).toBe(4523);
+    expect(values[':now']).toMatch(/^\d{4}-\d{2}-\d{2}T/);
   });
 
   it('does not throw when DynamoDB write fails', async () => {

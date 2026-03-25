@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { VerifyRequestSchema } from '@medical-validator/shared';
 import type { JwtClaims } from '@medical-validator/shared';
-import { createJob, getJobStatus, getVerificationResults } from '../clients/dynamodb.js';
+import { createJob, createTelemetryRecord, getJobStatus, getVerificationResults } from '../clients/dynamodb.js';
 import { sendToVerificationQueue } from '../clients/sqs.js';
 import { getCachedJobId, deleteCachedJobId } from '../clients/redis.js';
 import { createLogger } from '../shared/logger.js';
@@ -88,6 +88,14 @@ verifyRouter.post('/', async (req: Request, res: Response) => {
       status: 'queued',
       createdAt: now,
     });
+
+    // Write telemetry at submission — workers update this row as the pipeline progresses
+    const scraperProvider = process.env.SCRAPER_PROVIDER || 'opencorporates-api';
+    try {
+      await createTelemetryRecord({ jobId, companyName, normalizedName, scraperProvider });
+    } catch (err) {
+      logger.warn({ err: (err as Error).message, jobId }, 'Telemetry seed write failed');
+    }
 
     await sendToVerificationQueue({
       jobId,

@@ -5,7 +5,7 @@ import puppeteerExtra from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import type { Browser, Page, CookieParam } from 'puppeteer';
 import type { RawCompanyRecord } from '@medical-validator/shared';
-import type { ScraperProvider } from './scraper-provider.js';
+import type { ScraperProvider, ScrapeStats } from './scraper-provider.js';
 import { parseSearchResults } from './opencorporates-parser.js';
 import { createLogger } from '../shared/logger.js';
 
@@ -43,6 +43,8 @@ function randomUserAgent(): string {
 }
 
 export class OpenCorporatesProvider implements ScraperProvider {
+  readonly providerName = 'opencorporates' as const;
+  lastScrapeStats: ScrapeStats | null = null;
   private browser: Browser | null = null;
   private cookiesLoaded = false;
 
@@ -63,25 +65,29 @@ export class OpenCorporatesProvider implements ScraperProvider {
     try {
       const raw = readFileSync(COOKIES_PATH, 'utf-8');
       const cookies = JSON.parse(raw) as Array<{ name: string; value: string; domain: string; path?: string }>;
-      return cookies
+      const valid = cookies
         .filter((c) => typeof c.name === 'string' && typeof c.value === 'string' && typeof c.domain === 'string')
+        // Puppeteer rejects cookies with empty or whitespace-only values
+        .filter((c) => c.value.trim().length > 0)
         .map((c) => ({
           name: c.name,
           value: c.value,
           domain: c.domain,
           path: c.path || '/',
         }));
+      log.info({ total: cookies.length, valid: valid.length, skipped: cookies.length - valid.length }, 'Cookies loaded from disk');
+      return valid;
     } catch (err) {
       throw new Error(`STALE_COOKIES: Failed to load cookies from ${COOKIES_PATH} — refresh by running: npm run cookie:refresh`);
     }
   }
 
-  private async injectCookies(page: Page): Promise<void> {
-    if (this.cookiesLoaded) return;
+  private async injectCookies(page: Page, force = false): Promise<void> {
+    if (this.cookiesLoaded && !force) return;
     const cookies = this.loadCookiesFromFile();
     await page.setCookie(...cookies);
     this.cookiesLoaded = true;
-    log.info('Session cookies injected');
+    log.info({ force, cookieCount: cookies.length }, 'Session cookies injected');
   }
 
   private buildSearchUrl(normalizedName: string, jurisdiction?: string): string {
@@ -109,17 +115,24 @@ export class OpenCorporatesProvider implements ScraperProvider {
     await page.setUserAgent(randomUserAgent());
 
     try {
-      await this.injectCookies(page);
-      await randomDelay();
-
       const url = this.buildSearchUrl(normalizedName, jurisdiction);
       let lastError: Error | null = null;
+      const stats: ScrapeStats = { attempts: 0, errors: [] };
 
       for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+        stats.attempts = attempt;
         try {
+          // Re-inject cookies on every attempt (re-reads from disk in case cookie:refresh ran)
+          await this.injectCookies(page, attempt > 1);
+          await randomDelay();
+
+          log.info({ attempt, url: url.replace(/q=[^&]+/, 'q=***') }, 'Navigating to search page');
           await page.goto(url, { waitUntil: 'networkidle2', timeout: PAGE_TIMEOUT });
 
+          const finalUrl = page.url();
           const title = await page.evaluate(() => document.title);
+          log.info({ attempt, finalUrl, title }, 'Page loaded');
+
           if (title.includes('403') || title.includes('Forbidden')) {
             throw new Error('Blocked by HAProxy (403 Forbidden)');
           }
@@ -129,21 +142,34 @@ export class OpenCorporatesProvider implements ScraperProvider {
             throw new Error('STALE_COOKIES: CAPTCHA detected — refresh cookies by running: npm run cookie:refresh');
           }
 
-          if (page.url().includes('/users/sign_in')) {
+          if (finalUrl.includes('/users/sign_in')) {
             throw new Error('STALE_COOKIES: Session expired — refresh cookies by running: npm run cookie:refresh');
           }
 
           const html = await page.content();
-          return parseSearchResults(html);
+          const results = parseSearchResults(html);
+          log.info({ attempt, resultsCount: results.length }, 'Parse complete');
+          this.lastScrapeStats = stats;
+          return results;
         } catch (err) {
           lastError = err as Error;
-          log.warn({ attempt, maxRetries: MAX_RETRIES, err: (err as Error).message }, 'Scrape attempt failed');
+          stats.errors.push(lastError.message);
+          const isStale = lastError.message.includes('STALE_COOKIES');
+          log.warn(
+            { attempt, maxRetries: MAX_RETRIES, err: lastError.message, isStale },
+            'Scrape attempt failed',
+          );
+          if (isStale) {
+            // Force cookie re-read from disk on next attempt
+            this.cookiesLoaded = false;
+          }
           if (attempt < MAX_RETRIES) {
             await randomDelay();
           }
         }
       }
 
+      this.lastScrapeStats = stats;
       throw lastError || new Error('Scrape failed after retries');
     } finally {
       await page.close();

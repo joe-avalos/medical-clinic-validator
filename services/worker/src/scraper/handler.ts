@@ -6,6 +6,7 @@ import { TTL_DAYS } from '../shared/constants.js';
 import { createScraperProvider } from './scraper-provider.js';
 import { sendMessage } from '../shared/sqs.js';
 import { createLogger } from '../shared/logger.js';
+import { writeTelemetry } from '../shared/telemetry.js';
 
 const logger = createLogger('scraper');
 
@@ -17,9 +18,9 @@ const provider = createScraperProvider();
 
 export async function handleScraperMessage(body: unknown): Promise<void> {
   const message = VerificationJobMessageSchema.parse(body);
-  const log = logger.child({ jobId: message.jobId, companyName: message.companyName });
-  const scraperProvider = process.env.SCRAPER_PROVIDER || 'opencorporates-api';
-  log.info({ scraperProvider }, 'Received job');
+  const scraperProvider = provider.providerName;
+  const log = logger.child({ jobId: message.jobId, companyName: message.companyName, scraperProvider });
+  log.info({ envVar: process.env.SCRAPER_PROVIDER ?? '(unset)' }, 'Received job');
 
   // 1. Update job status → processing
   await updateJobStatus(message.jobId, 'processing');
@@ -43,8 +44,27 @@ export async function handleScraperMessage(body: unknown): Promise<void> {
     companies = await provider.search(message.normalizedName, message.jurisdiction);
   } catch (err) {
     const errorMsg = (err as Error).message;
-    log.error({ err: errorMsg, scraperProvider }, 'Scrape failed');
+    const stats = provider.lastScrapeStats;
+    log.error({ err: errorMsg, scraperProvider, scrapeAttempts: stats?.attempts, scrapeErrors: stats?.errors }, 'Scrape failed');
     await updateJobStatus(message.jobId, 'failed', errorMsg);
+
+    // Write telemetry for failed scrapes (these never reach the storage worker)
+    const durationMs = Date.now() - new Date(message.enqueuedAt).getTime();
+    await writeTelemetry({
+      jobId: message.jobId,
+      companyName: message.companyName,
+      normalizedName: message.normalizedName,
+      scraperProvider,
+      aiProvider: 'none',
+      cacheHit: false,
+      companiesFound: 0,
+      scrapeAttempts: stats?.attempts ?? 1,
+      scrapeErrors: stats?.errors ?? [errorMsg],
+      pipelinePath: 'scrape→failed',
+      validationOutcomes: { success: 0, fallback: 0, empty: 0 },
+      errorMessage: errorMsg,
+      durationMs,
+    });
 
     // Invalidate cache on stale cookie errors so subsequent searches
     // don't keep returning old cached results from the API layer
@@ -66,11 +86,14 @@ export async function handleScraperMessage(body: unknown): Promise<void> {
   log.info({ companiesFound: companies.length, scraperProvider }, 'Scrape complete');
 
   // 4. Build telemetry snapshot
+  const stats = provider.lastScrapeStats;
   const telemetry: PipelineTelemetry = {
     scraperProvider,
     cacheHit: false,
     companiesFound: companies.length,
     scrapeStartedAt: message.enqueuedAt,
+    scrapeAttempts: stats?.attempts ?? 1,
+    scrapeErrors: stats?.errors ?? [],
   };
 
   // 5. Publish ScraperResultMessage to validation queue

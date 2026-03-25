@@ -37,6 +37,8 @@ export const PipelineTelemetrySchema = z.object({
   cacheHit: z.boolean(),
   companiesFound: z.number(),
   scrapeStartedAt: z.string().datetime(),
+  scrapeAttempts: z.number().optional(),
+  scrapeErrors: z.array(z.string()).optional(),
   aiProvider: z.string().optional(),
   validationOutcomes: z.object({
     success: z.number(),
@@ -58,6 +60,8 @@ export interface JobTelemetry {
   aiProvider: string;
   cacheHit: boolean;
   companiesFound: number;
+  scrapeAttempts: number;
+  scrapeErrors: string[];
   pipelinePath: string;
   validationOutcomes: {
     success: number;

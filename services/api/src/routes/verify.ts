@@ -47,8 +47,10 @@ verifyRouter.post('/', async (req: Request, res: Response) => {
     return;
   }
 
-  const { companyName, jurisdiction, forceRefresh } = parsed.data;
+  const { companyName, jurisdiction, forceRefresh, aiProvider: requestedProvider } = parsed.data;
   const user = req.user as JwtClaims;
+  // Only internal users can select the AI provider — external users always get the default
+  const aiProvider = user.scope === 'internal' ? requestedProvider : undefined;
   const jobId = randomUUID();
   const now = new Date().toISOString();
   const normalizedName = normalizeName(companyName);
@@ -103,6 +105,7 @@ verifyRouter.post('/', async (req: Request, res: Response) => {
       normalizedName,
       jurisdiction,
       scope: user.scope,
+      aiProvider,
       enqueuedAt: now,
     });
 

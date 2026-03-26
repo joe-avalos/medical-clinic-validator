@@ -31,4 +31,10 @@ localstack_data/
 # Training data & model outputs
 services/worker/training-data/
 training/*.jsonl
+training/ollama-model/*.gguf
+training/medical-validator-ollama.zip
+training/finetune.log
 qwen-medical-validator/
+
+# Python venvs
+.venv-finetune/

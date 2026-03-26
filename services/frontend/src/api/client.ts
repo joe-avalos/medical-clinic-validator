@@ -1,5 +1,5 @@
 import axios from 'axios';
-import type { RiskLevel } from '@medical-validator/shared';
+import type { RiskLevel, AIProviderType } from '@medical-validator/shared';
 import { getToken, clearToken } from '../lib/auth.js';
 
 export interface VerifyResponse {
@@ -55,14 +55,18 @@ export async function checkHealth(): Promise<boolean> {
   }
 }
 
+export type AIProviderOption = Extract<AIProviderType, 'anthropic' | 'qwen'>;
+
 export async function submitVerification(
   companyName: string,
   jurisdiction?: string,
   forceRefresh?: boolean,
+  aiProvider?: AIProviderOption,
 ): Promise<VerifyResponse> {
   const body: Record<string, unknown> = { companyName };
   if (jurisdiction) body.jurisdiction = jurisdiction;
   if (forceRefresh) body.forceRefresh = true;
+  if (aiProvider) body.aiProvider = aiProvider;
   const { data } = await api.post<VerifyResponse>('/verify', body);
   return data;
 }

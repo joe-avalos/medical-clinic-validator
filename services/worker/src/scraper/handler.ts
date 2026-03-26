@@ -101,6 +101,7 @@ export async function handleScraperMessage(body: unknown): Promise<void> {
     jobId: message.jobId,
     normalizedName: message.normalizedName,
     scope: message.scope,
+    aiProvider: message.aiProvider,
     cachedResult: false,
     companies,
     scrapedAt: new Date().toISOString(),

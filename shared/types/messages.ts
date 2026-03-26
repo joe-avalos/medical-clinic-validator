@@ -29,6 +29,9 @@ export type JobStatus = z.infer<typeof JobStatus>;
 export const Scope = z.enum(['internal', 'external']);
 export type Scope = z.infer<typeof Scope>;
 
+export const AIProviderType = z.enum(['anthropic', 'ollama', 'qwen']);
+export type AIProviderType = z.infer<typeof AIProviderType>;
+
 // ─── Pipeline Telemetry ─────────────────────────────────────────────
 
 // Accumulated across workers via SQS message payload
@@ -83,6 +86,7 @@ export const VerificationJobMessageSchema = z.object({
   normalizedName: z.string(),
   jurisdiction: z.string().optional(),
   scope: Scope,
+  aiProvider: AIProviderType.optional(),
   enqueuedAt: z.string().datetime(),
 });
 export type VerificationJobMessage = z.infer<typeof VerificationJobMessageSchema>;
@@ -104,6 +108,7 @@ export const ScraperResultMessageSchema = z.object({
   jobId: z.string(),
   normalizedName: z.string(),
   scope: Scope,
+  aiProvider: AIProviderType.optional(),
   cachedResult: z.boolean(),
   companies: z.array(RawCompanyRecordSchema),
   scrapedAt: z.string().datetime(),
@@ -197,6 +202,7 @@ export const VerifyRequestSchema = z.object({
   companyName: z.string().min(2).max(200),
   jurisdiction: z.string().optional(),
   forceRefresh: z.boolean().optional(),
+  aiProvider: AIProviderType.optional(),
 });
 export type VerifyRequest = z.infer<typeof VerifyRequestSchema>;
 

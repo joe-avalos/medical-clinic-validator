@@ -1,0 +1,12 @@
+FROM ./medical-validator-q4_k_m.gguf
+
+PARAMETER temperature 0
+PARAMETER num_ctx 2048
+PARAMETER stop <|im_end|>
+
+TEMPLATE """{{ if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}<|im_start|>user
+{{ .Prompt }}<|im_end|>
+<|im_start|>assistant
+"""

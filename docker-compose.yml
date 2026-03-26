@@ -29,5 +29,24 @@ services:
       timeout: 3s
       retries: 5
 
+  ollama:
+    image: ollama/ollama:0.6.2
+    ports:
+      - "127.0.0.1:11434:11434"
+    entrypoint: ["/bin/bash", "/scripts/ollama-init.sh"]
+    restart: unless-stopped
+    mem_limit: 4g
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./training/ollama-model:/models:ro
+      - ./infra/scripts/ollama-init.sh:/scripts/ollama-init.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list | grep -q medical-validator"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
 volumes:
   localstack_data:
+  ollama_data:

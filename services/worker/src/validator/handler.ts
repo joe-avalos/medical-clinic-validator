@@ -1,4 +1,4 @@
-import { ScraperResultMessageSchema } from '@medical-validator/shared';
+import { ScraperResultMessageSchema, AIProviderType } from '@medical-validator/shared';
 import type { PipelineTelemetry, ValidationResult, ValidationResultMessage } from '@medical-validator/shared';
 import { createAIProvider } from './ai-provider.js';
 import { sendMessage } from '../shared/sqs.js';
@@ -7,8 +7,6 @@ import { createLogger } from '../shared/logger.js';
 const logger = createLogger('ai-validator');
 
 const STORAGE_QUEUE_URL = process.env.SQS_STORAGE_QUEUE_URL || 'http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/storage-queue.fifo';
-
-const provider = createAIProvider();
 
 function buildEmptyResult(): ValidationResult {
   return {
@@ -29,7 +27,9 @@ function buildEmptyResult(): ValidationResult {
 export async function handleValidatorMessage(body: unknown): Promise<void> {
   const message = ScraperResultMessageSchema.parse(body);
   const log = logger.child({ jobId: message.jobId });
-  const aiProvider = process.env.AI_PROVIDER || 'anthropic';
+  const rawProvider = message.aiProvider || process.env.AI_PROVIDER || 'anthropic';
+  const aiProvider = AIProviderType.parse(rawProvider);
+  const provider = createAIProvider(aiProvider);
   log.info({ companiesReceived: message.companies.length, aiProvider }, 'Validation starting');
 
   let validations: ValidationResult[];

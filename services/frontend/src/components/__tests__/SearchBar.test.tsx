@@ -79,7 +79,7 @@ describe('SearchBar', () => {
     await user.type(screen.getByPlaceholderText('e.g. us_mn'), 'us_mn');
     await user.click(screen.getByRole('button', { name: 'Verify' }));
     await waitFor(() => {
-      expect(submitVerification).toHaveBeenCalledWith('Mayo Clinic', 'us_mn');
+      expect(submitVerification).toHaveBeenCalledWith('Mayo Clinic', 'us_mn', undefined, 'anthropic');
     });
   });
 
@@ -155,7 +155,7 @@ describe('SearchBar', () => {
     await user.type(screen.getByPlaceholderText('e.g. Mayo Health System'), 'Test Clinic');
     await user.click(screen.getByRole('button', { name: 'Verify' }));
     await waitFor(() => {
-      expect(submitVerification).toHaveBeenCalledWith('Test Clinic', undefined);
+      expect(submitVerification).toHaveBeenCalledWith('Test Clinic', undefined, undefined, 'anthropic');
     });
   });
 });

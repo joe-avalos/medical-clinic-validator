@@ -8,6 +8,10 @@ vi.mock('../../shared/logger.js', () => {
   return { createLogger: () => childLogger };
 });
 
+vi.mock('../training-collector.js', () => ({
+  captureTrainingExample: vi.fn(),
+}));
+
 const mockCreate = vi.fn();
 vi.mock('@anthropic-ai/sdk', () => ({
   default: class {
@@ -74,6 +78,14 @@ describe('createAIProvider', () => {
     const { createAIProvider } = await import('../ai-provider.js');
     const provider = createAIProvider();
     expect(provider).toBeDefined();
+  });
+
+  it('creates qwen provider when AI_PROVIDER=qwen', async () => {
+    process.env.AI_PROVIDER = 'qwen';
+    const { createAIProvider } = await import('../ai-provider.js');
+    const provider = createAIProvider();
+    expect(provider).toBeDefined();
+    expect(provider.validateAll).toBeTypeOf('function');
   });
 
   it('throws on unknown provider type', async () => {

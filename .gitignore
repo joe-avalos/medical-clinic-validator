@@ -11,6 +11,8 @@ services/worker/smoke-test.ts
 
 .vscode/*
 .idea
+CHEATSHEET*
+cheatsheet*
 
 # Secrets
 .env
@@ -19,8 +21,14 @@ services/worker/smoke-test.ts
 # Coverage
 coverage/
 
-# Council logs
+# Council hooks (removed — councils are agent-based now)
+.claude/hooks/
 .claude/councils/
 
 # LocalStack
 localstack_data/
+
+# Training data & model outputs
+services/worker/training-data/
+training/*.jsonl
+qwen-medical-validator/

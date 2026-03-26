@@ -5,6 +5,7 @@ import type { AIProvider } from './ai-provider.js';
 import { buildSystemPrompt, buildUserPrompt } from './prompts.js';
 import { buildFallbackResult } from '../shared/constants.js';
 import { createLogger } from '../shared/logger.js';
+import { captureTrainingExample } from './training-collector.js';
 
 const log = createLogger('ai-validator');
 
@@ -79,10 +80,15 @@ export class AnthropicProvider implements AIProvider {
         const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '');
         const parsed = JSON.parse(cleaned);
 
-        if (Array.isArray(parsed)) {
-          return ValidationResultSchema.parse(parsed[0]);
+        const result = Array.isArray(parsed)
+          ? ValidationResultSchema.parse(parsed[0])
+          : ValidationResultSchema.parse(parsed);
+        try {
+          captureTrainingExample(company, result, 'anthropic', MODEL);
+        } catch (captureErr) {
+          log.warn({ err: (captureErr as Error).message }, 'Training capture failed');
         }
-        return ValidationResultSchema.parse(parsed);
+        return result;
       } catch (err) {
         log.warn({ company: company.name, attempt, maxRetries: MAX_RETRIES, err: (err as Error).message }, 'Validation attempt failed');
         if (attempt === MAX_RETRIES) {

@@ -22,6 +22,7 @@
 14. [Frontend: React Query, No State Library](#14-frontend-react-query-no-state-library)
 15. [Multi-Agent Communication Contracts](#15-multi-agent-communication-contracts)
 16. [Known Gaps and Future Work](#16-known-gaps-and-future-work)
+17. [AI Provider Architecture](#17-ai-provider-architecture)
 
 ---
 
@@ -483,8 +484,70 @@ Auto-polls every 2 seconds, stops when the job resolves. No manual setInterval/c
 ### Planned features
 
 - **Multi-queue submit:** Concurrent search queue table on SearchPage with batch polling endpoint (`POST /verify/status/batch`). Designed, not yet implemented.
-- **Local AI model:** Ollama provider exists in code (`ollama-provider.ts`) but not yet trained. Path for LoRA fine-tuned model defined in AI Validator agent spec.
 
 ---
 
-*Last updated: 2026-03-25*
+## 17. AI Provider Architecture
+
+**Chosen:** Factory pattern with three providers behind a common `AIProvider` interface.
+
+```typescript
+interface AIProvider {
+  validateAll(companies: RawCompanyRecord[]): Promise<ValidationResult[]>;
+}
+
+type ProviderType = 'anthropic' | 'ollama' | 'qwen';
+```
+
+All three providers use the same system/user prompts and return the same `ValidationResult` schema. Swapping between them requires only changing `AI_PROVIDER` env var or passing `aiProvider` per-request.
+
+### Per-Request Provider Selection
+
+The `aiProvider` field threads through the full SQS pipeline:
+
+```
+Frontend dropdown → POST /verify (API) → VerificationJobMessage (SQS)
+  → Scraper (passthrough) → ScraperResultMessage (SQS)
+  → Validator handler (creates provider per-message)
+```
+
+The API scope-gates provider selection — only `internal` users can choose a provider. External users always get the default (`anthropic`). The validator falls back through: `message.aiProvider → process.env.AI_PROVIDER → 'anthropic'`.
+
+### Provider Implementations
+
+| Provider | Backend | Concurrency | Timeout | Notes |
+|---|---|---|---|---|
+| `AnthropicProvider` | Anthropic API (`claude-haiku-4-5`) | 3 (batched, 1s delay) | 30s | Training data capture on success |
+| `OllamaProvider` | Ollama `/v1/chat/completions` | Sequential | 30s | Generic Ollama models (e.g., `mistral:7b-instruct`) |
+| `QwenProvider` | Ollama-compatible `/v1/chat/completions` | 1–5 (configurable) | 15–180s | Fine-tuned GGUF, supports local Ollama or remote Modal |
+
+### Fine-Tuned Qwen Model
+
+A LoRA fine-tuned **Qwen 2.5 3B** model, quantized to Q4_K_M GGUF (~1.8GB). Trained on validation examples captured by `AnthropicProvider` during normal operation.
+
+**Training pipeline:**
+1. `AnthropicProvider` captures input/output pairs to `training-data/captures.jsonl` (auto-rotating at 10MB)
+2. `training/export-training-data.ts` converts captures to ChatML format for fine-tuning
+3. `training/finetune_qwen_colab.ipynb` (Colab GPU) or `training/finetune_local.py` (CPU) trains the LoRA adapter
+4. Model exported as GGUF via 2-step conversion (f16 → Q4_K_M quantize)
+
+### Deployment Options
+
+The `QwenProvider` speaks the OpenAI-compatible `/v1/chat/completions` protocol. The only configuration knob is `QWEN_OLLAMA_URL`:
+
+| Option | URL | Performance | Cost |
+|---|---|---|---|
+| **Local Ollama** | `http://localhost:11434` | ~30s–2min/request (CPU) | Free |
+| **Docker Ollama** | `docker compose --profile gpu up ollama` | Fast with GPU, slow without | Free |
+| **Modal (serverless T4)** | `https://<app>--medical-validator-inference.modal.run` | ~900ms/request | ~$0.59/hr GPU, scale-to-zero |
+
+**Modal deployment** (`training/modal_serve.py`):
+- CUDA 12.4 runtime image with `llama-cpp-python[server]`
+- GGUF stored on a Modal Volume (persistent across deploys)
+- `scaledown_window=300` — GPU stays warm for 5 min after last request, then scales to zero
+- `modal serve` for temporary dev testing, `modal deploy` for persistent endpoint
+- No auth on the endpoint (acceptable for dev/testing with low credits; add bearer token middleware for production)
+
+---
+
+*Last updated: 2026-03-27*

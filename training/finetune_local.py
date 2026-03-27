@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
 Local fine-tuning script for Qwen2.5-3B-Instruct.
-Requires: NVIDIA GPU with 16GB+ VRAM (or 8GB with reduced batch size).
+Runs on CPU with 64GB RAM (no NVIDIA GPU required).
 
 Usage:
-    pip install torch transformers datasets peft trl bitsandbytes accelerate
+    pip install torch transformers datasets peft trl accelerate
     python training/finetune_local.py --dataset training/dataset.jsonl [--output ./model-output]
 
 For GGUF export after training:
@@ -13,16 +13,18 @@ For GGUF export after training:
 """
 
 import argparse
+import gc
 import json
 import os
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 import torch
 from datasets import load_dataset
-from peft import LoraConfig, prepare_model_for_kbit_training, PeftModel
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from peft import LoraConfig, get_peft_model, PeftModel
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from trl import SFTTrainer, SFTConfig
 
 # ─── Defaults ────────────────────────────────────────────────────────
@@ -30,8 +32,8 @@ from trl import SFTTrainer, SFTConfig
 MODEL_ID = "Qwen/Qwen2.5-3B-Instruct"
 DEFAULT_OUTPUT = "./qwen-medical-validator"
 DEFAULT_EPOCHS = 3
-DEFAULT_BATCH_SIZE = 4
-DEFAULT_GRAD_ACCUM = 2
+DEFAULT_BATCH_SIZE = 1
+DEFAULT_GRAD_ACCUM = 8
 DEFAULT_LR = 2e-4
 DEFAULT_LORA_R = 16
 DEFAULT_LORA_ALPHA = 32
@@ -49,7 +51,7 @@ def parse_args():
     parser.add_argument("--lora-r", type=int, default=DEFAULT_LORA_R)
     parser.add_argument("--lora-alpha", type=int, default=DEFAULT_LORA_ALPHA)
     parser.add_argument("--export-gguf", action="store_true", help="Export to GGUF after training")
-    parser.add_argument("--eval-only", action="store_true", help="Only run evaluation on existing model")
+    parser.add_argument("--resume", action="store_true", help="Resume from latest checkpoint")
     return parser.parse_args()
 
 
@@ -61,31 +63,28 @@ def load_data(dataset_path: str):
 
 
 def train(args):
-    print(f"GPU: {torch.cuda.get_device_name(0)}")
-    print(f"VRAM: {torch.cuda.get_device_properties(0).total_mem / 1e9:.1f} GB")
+    import psutil
+    ram_gb = psutil.virtual_memory().total / 1e9
+    print(f"Device: CPU ({os.cpu_count()} cores)")
+    print(f"RAM: {ram_gb:.1f} GB")
+    print(f"PyTorch: {torch.__version__}")
 
     train_dataset, eval_dataset = load_data(args.dataset)
 
-    # Load model in 4-bit
-    bnb_config = BitsAndBytesConfig(
-        load_in_4bit=True,
-        bnb_4bit_quant_type="nf4",
-        bnb_4bit_compute_dtype=torch.bfloat16,
-        bnb_4bit_use_double_quant=True,
-    )
-
+    # Load model in float32 on CPU (no quantization — we have 64GB RAM)
     tokenizer = AutoTokenizer.from_pretrained(args.model, trust_remote_code=True)
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
 
+    print(f"Loading {args.model} in float32 on CPU...")
     model = AutoModelForCausalLM.from_pretrained(
         args.model,
-        quantization_config=bnb_config,
-        device_map="auto",
+        torch_dtype=torch.float32,
+        device_map="cpu",
         trust_remote_code=True,
     )
     model.config.use_cache = False
-    model = prepare_model_for_kbit_training(model)
+    model.enable_input_require_grads()
 
     print(f"Model: {args.model} ({model.num_parameters() / 1e9:.1f}B params)")
 
@@ -98,6 +97,11 @@ def train(args):
         bias="none",
         task_type="CAUSAL_LM",
     )
+    model = get_peft_model(model, lora_config)
+
+    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total = sum(p.numel() for p in model.parameters())
+    print(f"Trainable: {trainable / 1e6:.1f}M / {total / 1e9:.1f}B ({100 * trainable / total:.2f}%)")
 
     # Format into chat template
     def format_chat(example):
@@ -111,7 +115,7 @@ def train(args):
     train_formatted = train_dataset.map(format_chat)
     eval_formatted = eval_dataset.map(format_chat)
 
-    # Training config
+    # Training config — CPU: no bf16, no gradient checkpointing kwargs
     training_args = SFTConfig(
         output_dir=args.output,
         num_train_epochs=args.epochs,
@@ -120,16 +124,19 @@ def train(args):
         learning_rate=args.lr,
         lr_scheduler_type="cosine",
         warmup_ratio=0.1,
-        bf16=True,
-        logging_steps=10,
+        bf16=False,
+        fp16=False,
+        gradient_checkpointing=True,
+        logging_steps=5,
         eval_strategy="steps",
         eval_steps=50,
         save_strategy="steps",
-        save_steps=100,
-        save_total_limit=2,
-        max_seq_length=DEFAULT_MAX_SEQ_LEN,
-        dataset_kwargs={"skip_prepare_dataset": True},
+        save_steps=10,
+        save_total_limit=3,
+        max_length=DEFAULT_MAX_SEQ_LEN,
         report_to="none",
+        dataloader_num_workers=0,
+        use_cpu=True,
     )
 
     trainer = SFTTrainer(
@@ -137,39 +144,23 @@ def train(args):
         args=training_args,
         train_dataset=train_formatted,
         eval_dataset=eval_formatted,
-        peft_config=lora_config,
     )
 
-    trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Trainable parameters: {trainable / 1e6:.1f}M")
-    print("Starting training...")
+    ram_used = psutil.virtual_memory().percent
+    print(f"RAM usage after setup: {ram_used:.1f}%")
+    print(f"Starting training at {time.strftime('%H:%M:%S')}...")
+    print(f"Estimated: 4-8 hours for {len(train_formatted)} examples x {args.epochs} epochs on CPU")
 
-    trainer.train()
+    start = time.time()
+    trainer.train(resume_from_checkpoint=args.resume)
+    elapsed = time.time() - start
+    print(f"Training complete in {elapsed / 3600:.1f} hours")
 
     # Save LoRA adapters
     adapter_dir = os.path.join(args.output, "lora-adapters")
     trainer.save_model(adapter_dir)
     tokenizer.save_pretrained(adapter_dir)
     print(f"LoRA adapters saved to {adapter_dir}")
-
-    # Merge
-    print("Merging LoRA into base model...")
-    del model
-    torch.cuda.empty_cache()
-
-    base_model = AutoModelForCausalLM.from_pretrained(
-        args.model,
-        torch_dtype=torch.float16,
-        device_map="auto",
-        trust_remote_code=True,
-    )
-    merged = PeftModel.from_pretrained(base_model, adapter_dir)
-    merged = merged.merge_and_unload()
-
-    merged_dir = os.path.join(args.output, "merged")
-    merged.save_pretrained(merged_dir)
-    tokenizer.save_pretrained(merged_dir)
-    print(f"Merged model saved to {merged_dir}")
 
     # Final metrics
     metrics = trainer.state.log_history
@@ -179,6 +170,20 @@ def train(args):
     if eval_losses:
         print(f"Final eval loss:  {eval_losses[-1]:.4f}")
 
+    # Merge
+    print("Merging LoRA into base model...")
+    del trainer
+    gc.collect()
+
+    merged = model.merge_and_unload()
+    merged_dir = os.path.join(args.output, "merged")
+    merged.save_pretrained(merged_dir)
+    tokenizer.save_pretrained(merged_dir)
+    print(f"Merged model saved to {merged_dir}")
+
+    del merged
+    gc.collect()
+
     if args.export_gguf:
         export_gguf(merged_dir, args.output)
 
@@ -186,7 +191,6 @@ def train(args):
 def export_gguf(merged_dir: str, output_dir: str):
     gguf_path = os.path.join(output_dir, "medical-validator-q4_k_m.gguf")
 
-    # Check if llama.cpp convert script is available
     convert_script = "/tmp/llama.cpp/convert_hf_to_gguf.py"
     if not os.path.exists(convert_script):
         print("Cloning llama.cpp for GGUF conversion...")
@@ -194,14 +198,16 @@ def export_gguf(merged_dir: str, output_dir: str):
             ["git", "clone", "--depth", "1", "https://github.com/ggerganov/llama.cpp", "/tmp/llama.cpp"],
             check=True,
         )
-        subprocess.run(
-            ["pip", "install", "-q", "-r", "/tmp/llama.cpp/requirements/requirements-convert_hf_to_gguf.txt"],
-            check=True,
-        )
+        req_file = "/tmp/llama.cpp/requirements/requirements-convert_hf_to_gguf.txt"
+        if os.path.exists(req_file):
+            subprocess.run(
+                [sys.executable, "-m", "pip", "install", "-q", "-r", req_file],
+                check=True,
+            )
 
     print("Converting to GGUF (Q4_K_M)...")
     subprocess.run(
-        ["python", convert_script, merged_dir, "--outfile", gguf_path, "--outtype", "q4_k_m"],
+        [sys.executable, convert_script, merged_dir, "--outfile", gguf_path, "--outtype", "q4_k_m"],
         check=True,
     )
 
@@ -210,21 +216,17 @@ def export_gguf(merged_dir: str, output_dir: str):
 
     # Write Ollama Modelfile
     modelfile_path = os.path.join(output_dir, "Modelfile")
-    modelfile = """FROM ./medical-validator-q4_k_m.gguf
-
-PARAMETER temperature 0
-PARAMETER num_ctx 2048
-PARAMETER stop <|im_end|>
-
-TEMPLATE \"\"\"{{ if .System }}<|im_start|>system
-{{ .System }}<|im_end|>
-{{ end }}<|im_start|>user
-{{ .Prompt }}<|im_end|>
-<|im_start|>assistant
-\"\"\"
-"""
     with open(modelfile_path, "w") as f:
-        f.write(modelfile)
+        f.write('FROM ./medical-validator-q4_k_m.gguf\n\n')
+        f.write('PARAMETER temperature 0\n')
+        f.write('PARAMETER num_ctx 2048\n')
+        f.write('PARAMETER stop <|im_end|>\n\n')
+        f.write('TEMPLATE """{{ if .System }}<|im_start|>system\n')
+        f.write('{{ .System }}<|im_end|>\n')
+        f.write('{{ end }}<|im_start|>user\n')
+        f.write('{{ .Prompt }}<|im_end|>\n')
+        f.write('<|im_start|>assistant\n')
+        f.write('"""\n')
 
     print(f"\nTo load in Ollama:")
     print(f"  cd {output_dir}")
@@ -233,7 +235,4 @@ TEMPLATE \"\"\"{{ if .System }}<|im_start|>system
 
 if __name__ == "__main__":
     args = parse_args()
-    if not torch.cuda.is_available():
-        print("ERROR: No CUDA GPU detected. Use the Colab notebook instead.")
-        sys.exit(1)
     train(args)

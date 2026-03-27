@@ -38,3 +38,7 @@ qwen-medical-validator/
 
 # Python venvs
 .venv-finetune/
+
+# Python bytecode
+__pycache__/
+*.pyc
